@@ -1,0 +1,120 @@
+﻿
+> logistikpro-pwa@0.0.0 lint
+> eslint .
+
+
+C:\laragon\www\logistikpro-pwa\src\App.tsx
+  2:47  error  'Navigate' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\laragon\www\logistikpro-pwa\src\components\PrintInvoice.tsx
+  227:58  error  'dateCombo' is defined but never used  @typescript-eslint/no-unused-vars
+  276:50  error  'idx' is defined but never used        @typescript-eslint/no-unused-vars
+
+C:\laragon\www\logistikpro-pwa\src\components\PrintRekapTrips.tsx
+  22:3  error  'grupMobils' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\laragon\www\logistikpro-pwa\src\components\ui\badge.tsx
+  36:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\laragon\www\logistikpro-pwa\src\components\ui\button.tsx
+  57:18  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\laragon\www\logistikpro-pwa\src\lib\db.ts
+  199:16  error  'tx' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\laragon\www\logistikpro-pwa\src\lib\excel-utils.ts
+   34:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  136:49  error  Unnecessary escape character: \/          no-useless-escape
+  136:53  error  Unnecessary escape character: \?          no-useless-escape
+  136:55  error  Unnecessary escape character: \*          no-useless-escape
+  136:57  error  Unnecessary escape character: \[          no-useless-escape
+  136:62  error  Unnecessary escape character: \'          no-useless-escape
+  136:64  error  Unnecessary escape character: \"          no-useless-escape
+  137:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\laragon\www\logistikpro-pwa\src\pages\Finance.tsx
+   47:37  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+   58:29  error  Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  110:9   error  'p' is never reassigned. Use 'const' instead  prefer-const
+
+C:\laragon\www\logistikpro-pwa\src\pages\Invoices.tsx
+   13:13  error    'XLSX' is defined but never used                                                                                                  @typescript-eslint/no-unused-vars
+   39:56  error    Unexpected any. Specify a different type                                                                                          @typescript-eslint/no-explicit-any
+   97:6   warning  React Hook useMemo has missing dependencies: 'filterAkhir' and 'filterMulai'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+  168:14  error    'error' is defined but never used                                                                                                 @typescript-eslint/no-unused-vars
+  173:41  error    Unexpected any. Specify a different type                                                                                          @typescript-eslint/no-explicit-any
+  194:43  error    Unexpected any. Specify a different type                                                                                          @typescript-eslint/no-explicit-any
+  200:62  error    Unexpected any. Specify a different type                                                                                          @typescript-eslint/no-explicit-any
+  205:16  error    'error' is defined but never used                                                                                                 @typescript-eslint/no-unused-vars
+  211:31  error    Unexpected any. Specify a different type                                                                                          @typescript-eslint/no-explicit-any
+  231:14  error    'err' is defined but never used                                                                                                   @typescript-eslint/no-unused-vars
+  236:34  error    Unexpected any. Specify a different type                                                                                          @typescript-eslint/no-explicit-any
+
+C:\laragon\www\logistikpro-pwa\src\pages\MasterData.tsx
+  9:24  error  'Edit2' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\laragon\www\logistikpro-pwa\src\pages\Onboarding.tsx
+  38:16  error  'err' is defined but never used    @typescript-eslint/no-unused-vars
+  69:14  error  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\laragon\www\logistikpro-pwa\src\pages\Settings.tsx
+   31:7   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\laragon\www\logistikpro-pwa\src\pages\Settings.tsx:31:7
+  29 |   useEffect(() => {
+  30 |     if (settings) {
+> 31 |       setUserName(settings.userName || '');
+     |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  32 |       setCompanyName(settings.companyName || 'LogistikPro PWA');
+  33 |       setUserAvatar(settings.userAvatar || null);
+  34 |     }  react-hooks/set-state-in-effect
+   61:16  error  'err' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+   78:14  error  'error' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+   85:34  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
+  102:14  error  'error' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  127:14  error  'error' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+
+C:\laragon\www\logistikpro-pwa\src\pages\Slips.tsx
+   35:50  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  179:14  error  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  201:14  error  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  206:41  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  213:64  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  242:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  258:14  error  'err' is defined but never used           @typescript-eslint/no-unused-vars
+  263:42  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  266:16  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  308:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  422:31  error  'ptg' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\laragon\www\logistikpro-pwa\src\pages\Trips.tsx
+   13:16  error  'localeId' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+   15:43  error  'Camera' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+   15:73  error  'ImageIcon' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+   57:62  error  Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\laragon\www\logistikpro-pwa\src\pages\Trips.tsx:57:62
+  55 |     grup_mobil_id: string;
+  56 |   }
+> 57 |   const [massRows, setMassRows] = useState<MassRow[]>([{ id: Date.now(), plat_nomor: '', volume: '', grup_mobil_id: '' }]);
+     |                                                              ^^^^^^^^^^ Cannot call impure function
+  58 |
+  59 |   // Filter Print / Excel State
+  60 |   const [printModalOpen, setPrintModalOpen] = useState(false);  react-hooks/purity
+  106:16  error  'err' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  169:41  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-explicit-any
+  210:14  error  'e' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+  249:16  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-explicit-any
+  505:37  error  'index' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+
+Γ£û 58 problems (57 errors, 1 warning)
+  1 error and 0 warnings potentially fixable with the `--fix` option.
+
