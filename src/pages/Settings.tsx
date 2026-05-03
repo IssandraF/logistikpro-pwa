@@ -13,8 +13,8 @@ import { User, Image as ImageIcon } from 'lucide-react';
 import { compressImage } from '@/lib/image-utils';
 
 export default function Settings() {
-  const settings = useLiveQuery(() => db.storeSettings.limit(1).first());
-  
+  const settingsArray = useLiveQuery(() => db.storeSettings.toArray());
+  const settings = settingsArray?.[0];
   const [file, setFile] = useState<File | null>(null);
 
   // Profile State
@@ -74,8 +74,14 @@ export default function Settings() {
           companyName: companyName.trim() || 'LogistikPro PWA',
           userAvatar: userAvatar || undefined
         });
-        toast.success('Profil berhasil diperbarui');
+      } else {
+        await db.storeSettings.add({
+          userName: userName.trim(),
+          companyName: companyName.trim() || 'LogistikPro PWA',
+          userAvatar: userAvatar || undefined
+        });
       }
+      toast.success('Profil berhasil diperbarui');
     } catch {
       toast.error('Gagal menyimpan profil');
     }

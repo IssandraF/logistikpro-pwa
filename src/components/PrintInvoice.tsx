@@ -24,10 +24,10 @@ export default function PrintInvoice({
   lokasiKuaris,
   includePhotos
 }: PrintInvoiceProps) {
-  
+
   // Sort Summary Grouped by Muat|Bongkar|Lokasi
   const summaryTrips = [...trips].sort((a, b) => new Date(a.tanggal_bongkar).getTime() - new Date(b.tanggal_bongkar).getTime());
-  
+
   const groupedSummary = summaryTrips.reduce((acc, t) => {
     const key = `${format(new Date(t.tanggal_muat), 'yyyy-MM-dd')}|${format(new Date(t.tanggal_bongkar), 'yyyy-MM-dd')}|${t.proyek_lokasi_id}`;
     if (!acc[key]) acc[key] = [];
@@ -106,20 +106,20 @@ export default function PrintInvoice({
           {Object.entries(groupedSummary).map(([key, items]) => {
             const first = items[0];
             const currentDateCombo = key;
-            
+
             let displayDate = null;
             if (currentDateCombo !== lastDateCbm) {
               displayDate = (
                 <>
-                  {format(new Date(first.tanggal_muat), 'EEEE, dd MMM yyyy', { locale: id })}<br/>
+                  {format(new Date(first.tanggal_muat), 'EEEE, dd MMM yyyy', { locale: id })}<br />
                   {format(new Date(first.tanggal_bongkar), 'EEEE, dd MMM yyyy', { locale: id })}
                 </>
               );
             }
-            
+
             const borderTop = (currentDateCombo !== lastDateCbm && noSummary > 1) ? 'border-t-2 border-black' : '';
             lastDateCbm = currentDateCombo;
-            
+
             const totalVol = items.reduce((sum, t) => sum + t.volume, 0);
             const totalHarga = items.reduce((sum, t) => sum + t.total_harga, 0);
 
@@ -136,7 +136,7 @@ export default function PrintInvoice({
               </tr>
             );
           })}
-          
+
           {invoice.is_potong_material === 1 ? (
             <>
               <tr className="font-bold">
@@ -172,8 +172,8 @@ export default function PrintInvoice({
       </div>
 
       <div className="mt-5">
-        <p><strong>Pembayaran dapat ditransfer ke:</strong><br/>
-           {owner.nama_bank}: {owner.no_rek} A.n {owner.atas_nama}
+        <p><strong>Pembayaran dapat ditransfer ke:</strong><br />
+          {owner.nama_bank}: {owner.no_rek} A.n {owner.atas_nama}
         </p>
       </div>
 
@@ -182,8 +182,8 @@ export default function PrintInvoice({
           <tr>
             <td className="w-[70%] border-none"></td>
             <td className="w-[30%] text-center border-none">
-              {format(new Date(invoice.tanggal_invoice), 'EEEE, dd MMMM yyyy', { locale: id })}<br/>
-              Hormat kami,<br/><br/><br/><br/><br/>
+              {format(new Date(invoice.tanggal_invoice), 'EEEE, dd MMMM yyyy', { locale: id })}<br />
+              Hormat kami,<br /><br /><br /><br /><br />
               <strong>{(invoice.nama_ttd || owner.nama).toUpperCase()}</strong>
             </td>
           </tr>
@@ -195,22 +195,22 @@ export default function PrintInvoice({
         <div key={lokasi} className="page-break-before-always" style={{ pageBreakBefore: 'always', marginTop: '40px' }}>
           <div className="page-break" />
           <div className="text-center font-bold text-[14px] mb-2 leading-relaxed">
-            REKAP PENGIRIMAN CBM KE {proyek.nama_proyek.toUpperCase()}<br/>
+            REKAP PENGIRIMAN CBM KE {proyek.nama_proyek.toUpperCase()}<br />
             PENGIRIM {owner.nama.toUpperCase()}
           </div>
-          
+
           <div className="font-bold mb-1">LOKASI BONGKARAN: {lokasi}</div>
-          
+
           <table className="table-bordered info-table w-full">
             <thead className="bg-[#00B0F0] text-black">
               <tr>
                 <th className="w-[5%]">NO</th>
-                <th>TGL MUAT & BONGKAR</th>
-                <th>Jenis Angkutan</th>
-                <th>PLAT NOMOR</th>
-                <th>KET</th>
-                <th>VOLUME (M3)</th>
-                <th>TOTAL VOLUME (M3)</th>
+                <th className="w-[29%]">TGL MUAT & BONGKAR</th>
+                <th className="w-[6%]">Jenis</th>
+                <th className="w-[15%]">PLAT NOMOR</th>
+                <th className="w-[15%]">KET</th>
+                <th className="w-[14%]">VOLUME (M3)</th>
+                <th className="w-[18%]">TOTAL VOLUME (M3)</th>
               </tr>
             </thead>
             <tbody>
@@ -235,7 +235,7 @@ export default function PrintInvoice({
                       <td className="text-center" style={{ borderTop: idx === 0 ? '1px solid #000' : 'none', borderBottom: idx === dailyTrips.length - 1 ? '1px solid #000' : 'none' }}>
                         {idx === 0 && (
                           <>
-                            <span className="text-xs text-gray-500">M:</span> {format(new Date(trip.tanggal_muat), 'EEEE, dd MMM yyyy', { locale: id })}<br/>
+                            <span className="text-xs text-gray-500">M:</span> {format(new Date(trip.tanggal_muat), 'EEEE, dd MMM yyyy', { locale: id })}<br />
                             <span className="text-xs text-gray-500">B:</span> {format(new Date(trip.tanggal_bongkar), 'EEEE, dd MMM yyyy', { locale: id })}
                           </>
                         )}
@@ -243,8 +243,8 @@ export default function PrintInvoice({
                       <td className="text-center">DT</td>
                       <td className="text-center font-bold">{trip.plat_nomor}</td>
                       <td className="text-center">{getKuariName(trip.lokasi_kuari_id)}</td>
-                      <td className="text-right">{trip.volume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="text-right font-bold" style={{ background: idx === 0 ? '#f0f0f0' : 'transparent', borderTop: idx === 0 ? '1px solid #000' : 'none', borderBottom: idx === dailyTrips.length - 1 ? '1px solid #000' : 'none' }}>
+                      <td className="text-center">{trip.volume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="text-center font-bold" style={{ background: idx === 0 ? '#f0f0f0' : 'transparent', borderTop: idx === 0 ? '1px solid #000' : 'none', borderBottom: idx === dailyTrips.length - 1 ? '1px solid #000' : 'none' }}>
                         {idx === 0 ? dailyVolume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}
                       </td>
                     </tr>
@@ -268,22 +268,22 @@ export default function PrintInvoice({
           <div className="text-center font-bold text-[14px] mb-5 underline">
             LAMPIRAN BUKTI DELIVERY ORDER (DO)
           </div>
-          
+
           <div className="flex flex-wrap w-full">
             {(() => {
-               // Flat all trips that have images
-               const tripsWithPhotos = trips.filter(t => t.bukti_do);
-               return tripsWithPhotos.map((trip) => (
-                 <div key={trip.id} className="w-[50%] p-2 text-center border border-dashed border-gray-300">
-                   <div className="font-bold text-[11px] mb-1">
-                     {trip.plat_nomor} - {format(new Date(trip.tanggal_bongkar), 'dd/MM/yyyy')}
-                   </div>
-                   <div className="text-[10px] mb-2">
-                     Vol: {trip.volume} M³ | Lok: {getLokasiName(trip.proyek_lokasi_id)}
-                   </div>
-                   <img src={trip.bukti_do} className="max-w-[90%] max-h-[250px] object-contain border border-gray-200 p-[2px] mx-auto" />
-                 </div>
-               ));
+              // Flat all trips that have images
+              const tripsWithPhotos = trips.filter(t => t.bukti_do);
+              return tripsWithPhotos.map((trip) => (
+                <div key={trip.id} className="w-[50%] p-2 text-center border border-dashed border-gray-300">
+                  <div className="font-bold text-[11px] mb-1">
+                    {trip.plat_nomor} - {format(new Date(trip.tanggal_bongkar), 'dd/MM/yyyy')}
+                  </div>
+                  <div className="text-[10px] mb-2">
+                    Vol: {trip.volume} M³ | Lok: {getLokasiName(trip.proyek_lokasi_id)}
+                  </div>
+                  <img src={trip.bukti_do} className="max-w-[90%] max-h-[250px] object-contain border border-gray-200 p-[2px] mx-auto" />
+                </div>
+              ));
             })()}
           </div>
         </div>

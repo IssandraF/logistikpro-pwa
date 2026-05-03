@@ -19,7 +19,8 @@ export default function Onboarding() {
   useEffect(() => {
     // Cek apakah sudah pernah onboarding
     const checkStatus = async () => {
-      const setting = await db.storeSettings.limit(1).first();
+      const settingsArray = await db.storeSettings.toArray();
+      const setting = settingsArray[0];
       if (setting && setting.userName) {
         navigate('/app');
       } else if (setting && setting.companyName) {
@@ -49,7 +50,8 @@ export default function Onboarding() {
 
     setIsLoading(true);
     try {
-      const setting = await db.storeSettings.limit(1).first();
+      const settingsArray = await db.storeSettings.toArray();
+      const setting = settingsArray[0];
       if (setting && setting.id) {
         await db.storeSettings.update(setting.id, {
           userName: userName.trim(),

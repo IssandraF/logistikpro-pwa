@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { format } from 'date-fns';
 
 import { toast } from 'sonner';
-import { Download, Printer, Plus, Trash2, CheckSquare } from 'lucide-react';
+import { Download, Printer, Plus, Trash2, CheckSquare, Edit, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import PrintRekapTrips from '@/components/PrintRekapTrips';
 import { printWithTitle } from '@/lib/print-utils';
@@ -39,6 +39,7 @@ export default function Trips() {
   const [tglMuat, setTglMuat] = useState('');
   const [tglBongkar, setTglBongkar] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
+  const [editingTripId, setEditingTripId] = useState<number | null>(null);
 
   // Form State (Mass Input)
   const [massTglMuat, setMassTglMuat] = useState('');
@@ -110,33 +111,108 @@ export default function Trips() {
   };
 
   // Single Input
+  const editTrip = (t: import('@/lib/db').Trip) => {
+    setEditingTripId(t.id!);
+    setGrupId(t.grup_mobil_id.toString());
+    setPlatNomor(t.plat_nomor);
+    setProyekLokasiId(t.proyek_lokasi_id.toString());
+    setKuariId(t.lokasi_kuari_id.toString());
+    setJasaId(t.jenis_jasa_id.toString());
+    setVolume(t.volume.toString());
+    setHargaTrip(t.harga_trip.toString());
+    setTglMuat(format(new Date(t.tanggal_muat), 'yyyy-MM-dd'));
+    setTglBongkar(format(new Date(t.tanggal_bongkar), 'yyyy-MM-dd'));
+    setPhoto(t.bukti_do || null);
+    setActiveTab('single');
+  };
+
+  const cancelEditTrip = () => {
+    setEditingTripId(null);
+    setGrupId(''); setPlatNomor(''); setProyekLokasiId(''); setKuariId(''); setJasaId(''); setVolume(''); setHargaTrip(''); setTglMuat(''); setTglBongkar(''); setPhoto(null);
+  };
+
+  const syncInvoiceTotals = async (invoiceId: number) => {
+    const invTrips = await db.trips.where('invoice_id').equals(invoiceId).filter(t => t.isDeleted === 0).toArray();
+    const qPrices = await db.invoiceQuarryPrices.where('invoice_id').equals(invoiceId).toArray();
+    
+    let vol = 0;
+    let kotor = 0;
+    const kuariMap: Record<number, number> = {};
+    
+    invTrips.forEach(t => {
+      vol += t.volume;
+      kotor += t.total_harga;
+      kuariMap[t.lokasi_kuari_id] = (kuariMap[t.lokasi_kuari_id] || 0) + 1;
+    });
+
+    let potongan = 0;
+    for (const qp of qPrices) {
+      const count = kuariMap[qp.lokasi_kuari_id] || 0;
+      await db.invoiceQuarryPrices.update(qp.id!, { jumlah_trip: count });
+      potongan += count * qp.harga_material_override;
+    }
+
+    const bersih = kotor - potongan;
+
+    await db.invoices.update(invoiceId, {
+      total_kubikasi: vol,
+      total_harga_kotor: kotor,
+      total_potongan_material: potongan,
+      total_harga_bersih: bersih
+    });
+  };
+
   const handleSaveSingle = async () => {
     if (!grupId || !platNomor || !proyekLokasiId || !kuariId || !jasaId || !volume || !hargaTrip || !tglMuat || !tglBongkar) {
       toast.error('Harap isi semua field yang wajib');
       return;
     }
-    await db.trips.add({
-      grup_mobil_id: Number(grupId),
-      plat_nomor: platNomor.toUpperCase(),
-      lokasi_kuari_id: Number(kuariId),
-      proyek_lokasi_id: Number(proyekLokasiId),
-      jenis_jasa_id: Number(jasaId),
-      volume: Number(volume),
-      harga_trip: Number(hargaTrip),
-      total_harga: Number(volume) * Number(hargaTrip),
-      tanggal_muat: new Date(tglMuat),
-      tanggal_bongkar: new Date(tglBongkar),
-      bukti_do: photo || undefined,
-      invoice_id: null,
-      slip_pembayaran_id: null,
-      createdAt: new Date(),
-      isDeleted: 0
-    });
-    toast.success('Trip berhasil ditambahkan');
+    
+    if (editingTripId) {
+      const existingTrip = await db.trips.get(editingTripId);
+
+      await db.trips.update(editingTripId, {
+        grup_mobil_id: Number(grupId),
+        plat_nomor: platNomor.toUpperCase(),
+        lokasi_kuari_id: Number(kuariId),
+        proyek_lokasi_id: Number(proyekLokasiId),
+        jenis_jasa_id: Number(jasaId),
+        volume: Number(volume),
+        harga_trip: Number(hargaTrip),
+        total_harga: Number(volume) * Number(hargaTrip),
+        tanggal_muat: new Date(tglMuat),
+        tanggal_bongkar: new Date(tglBongkar),
+        bukti_do: photo || undefined,
+      });
+
+      if (existingTrip?.invoice_id) {
+        await syncInvoiceTotals(existingTrip.invoice_id);
+      }
+
+      toast.success('Trip berhasil diperbarui');
+    } else {
+      await db.trips.add({
+        grup_mobil_id: Number(grupId),
+        plat_nomor: platNomor.toUpperCase(),
+        lokasi_kuari_id: Number(kuariId),
+        proyek_lokasi_id: Number(proyekLokasiId),
+        jenis_jasa_id: Number(jasaId),
+        volume: Number(volume),
+        harga_trip: Number(hargaTrip),
+        total_harga: Number(volume) * Number(hargaTrip),
+        tanggal_muat: new Date(tglMuat),
+        tanggal_bongkar: new Date(tglBongkar),
+        bukti_do: photo || undefined,
+        invoice_id: null,
+        slip_pembayaran_id: null,
+        createdAt: new Date(),
+        isDeleted: 0
+      });
+      toast.success('Trip berhasil ditambahkan');
+    }
+    
     setActiveTab('data');
-    setPlatNomor('');
-    setVolume('');
-    setPhoto(null);
+    cancelEditTrip();
   };
 
   // Mass Input Functions
@@ -213,7 +289,11 @@ export default function Trips() {
   };
 
   const deleteTrip = async (id: number) => {
+    const existing = await db.trips.get(id);
     await db.trips.update(id, { isDeleted: 1 });
+    if (existing?.invoice_id) {
+      await syncInvoiceTotals(existing.invoice_id);
+    }
     toast.success('Trip dihapus');
   };
 
@@ -357,8 +437,9 @@ export default function Trips() {
                         <td className="p-3">
                           {t.invoice_id ? <span className="bg-success/20 text-success px-2 py-1 rounded text-xs">Di-invoice</span> : <span className="bg-warning/20 text-warning px-2 py-1 rounded text-xs">Pending</span>}
                         </td>
-                        <td className="p-3">
-                          <Button variant="ghost" size="icon" onClick={() => deleteTrip(t.id!)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                        <td className="p-3 flex gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => editTrip(t)}><Edit className="w-4 h-4 text-blue-500" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => { if(confirm('Hapus Trip ini?')) deleteTrip(t.id!) }}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                         </td>
                       </tr>
                     ))}
@@ -374,7 +455,7 @@ export default function Trips() {
         {/* TAB SINGLE INPUT */}
         <TabsContent value="single">
           <Card>
-            <CardHeader><CardTitle>Tambah Trip Baru (Single)</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{editingTripId ? 'Edit Trip Operasional' : 'Tambah Trip Baru (Single)'}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -386,7 +467,7 @@ export default function Trips() {
                 </div>
                 <div className="space-y-2">
                   <Label>Plat Nomor</Label>
-                  <Input value={platNomor} onChange={e => setPlatNomor(e.target.value)} placeholder="BE 1234 XX" />
+                  <Input value={platNomor} onChange={e => setPlatNomor(e.target.value.toUpperCase())} className="uppercase" placeholder="BE 1234 XX" />
                 </div>
                 <div className="space-y-2">
                   <Label>Tanggal Muat</Label>
@@ -437,7 +518,14 @@ export default function Trips() {
                   {photo && <img src={photo} alt="Preview" className="h-24 w-24 object-cover rounded mt-2" />}
                 </div>
               </div>
-              <Button onClick={handleSaveSingle} className="w-full mt-4"><Plus className="w-4 h-4 mr-2" /> Simpan Trip</Button>
+              <div className="flex gap-4 mt-4">
+                <Button onClick={handleSaveSingle} className="flex-1">
+                  {editingTripId ? 'Simpan Perubahan' : <><Plus className="w-4 h-4 mr-2" /> Simpan Trip</>}
+                </Button>
+                {editingTripId && (
+                  <Button variant="outline" onClick={() => { cancelEditTrip(); setActiveTab('data'); }}>Batal</Button>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

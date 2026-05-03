@@ -19,11 +19,12 @@ const navItems = [
 export default function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const settings = useLiveQuery(() => db.storeSettings.limit(1).first());
+  const settingsArray = useLiveQuery(() => db.storeSettings.toArray());
+  const settings = settingsArray?.[0];
 
   useEffect(() => {
-    // Only redirect if settings is loaded, and it's not the onboarding page
-    if (settings !== undefined && location.pathname !== '/app/onboarding') {
+    // Only redirect if settings array is loaded, and it's not the onboarding page
+    if (settingsArray !== undefined && location.pathname !== '/app/onboarding') {
       if (!settings?.userName) {
         navigate('/app/onboarding');
       }
@@ -33,6 +34,16 @@ export default function AppLayout() {
   // If we're on the onboarding page, render just the Outlet (no sidebar)
   if (location.pathname === '/app/onboarding') {
     return <Outlet />;
+  }
+
+  // Show loading state while checking DB to prevent flashing
+  if (settingsArray === undefined) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-4 border-primary"></div>
+        <p className="text-muted-foreground animate-pulse">Memuat data...</p>
+      </div>
+    );
   }
 
   return (

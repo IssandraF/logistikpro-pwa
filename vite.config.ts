@@ -15,6 +15,8 @@ export default defineConfig({
         short_name: 'LogistikPro',
         description: 'Sistem Manajemen Logistik Proyek',
         theme_color: '#ffffff',
+        start_url: '/app',
+        display: 'standalone',
         icons: [
           {
             src: 'pwa-192x192.png',
