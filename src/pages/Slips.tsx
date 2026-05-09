@@ -58,7 +58,8 @@ export default function Slips() {
     const filtered = pendingTrips.filter(t => t.grup_mobil_id === Number(grupId));
     
     const grouped = filtered.reduce((acc, t) => {
-      const key = `${t.proyek_lokasi_id}|${t.lokasi_kuari_id}`;
+      const tglBongkar = t.tanggal_bongkar ? format(new Date(t.tanggal_bongkar), 'yyyy-MM-dd') : 'Belum Bongkar';
+      const key = `${tglBongkar}|${t.proyek_lokasi_id}|${t.lokasi_kuari_id}`;
       if (!acc[key]) acc[key] = [];
       acc[key].push(t);
       return acc;
@@ -131,7 +132,8 @@ export default function Slips() {
       // 2. Update Trips
       const tripIds = filteredTrips.map(t => t.id!);
       await db.trips.where('id').anyOf(tripIds).modify(t => {
-        const key = `${t.proyek_lokasi_id}|${t.lokasi_kuari_id}`;
+        const tglBongkar = t.tanggal_bongkar ? format(new Date(t.tanggal_bongkar), 'yyyy-MM-dd') : 'Belum Bongkar';
+        const key = `${tglBongkar}|${t.proyek_lokasi_id}|${t.lokasi_kuari_id}`;
         t.slip_pembayaran_id = Number(slipId);
         t.harga_bayar = groupPrices[key] !== undefined ? groupPrices[key] : t.harga_trip;
       });
@@ -421,8 +423,9 @@ export default function Slips() {
                     <div className="space-y-4">
                       {Object.entries(groupedTrips).map(([key, groupTrips]) => {
                         const parts = key.split('|');
-                        const plId = Number(parts[0]);
-                        const kId = Number(parts[1]);
+                        const tglBongkar = parts[0];
+                        const plId = Number(parts[1]);
+                        const kId = Number(parts[2]);
                         const vol = groupTrips.reduce((s, t) => s + t.volume, 0);
                         const hrg = groupPrices[key] !== undefined ? groupPrices[key] : groupTrips[0].harga_trip;
 
@@ -432,6 +435,7 @@ export default function Slips() {
                               <div>
                                 <p className="font-bold text-sm text-primary">Tujuan: {getLokasiName(plId)}</p>
                                 <p className="text-sm font-semibold text-orange-600">Asal Kuari: {getKuariName(kId)}</p>
+                                <p className="text-sm font-semibold text-blue-600">Tanggal Bongkar: {tglBongkar !== 'Belum Bongkar' ? format(new Date(tglBongkar), 'dd/MM/yyyy') : tglBongkar}</p>
                               </div>
                               <div className="text-right">
                                 <p className="font-bold">{groupTrips.length} Rit</p>
@@ -471,11 +475,14 @@ export default function Slips() {
                     <div className="space-y-2 mb-4">
                       <p className="font-semibold text-sm">Rincian Ongkos Awal:</p>
                       {Object.entries(groupedTrips).map(([key, groupTrips]) => {
+                        const parts = key.split('|');
+                        const tglBongkar = parts[0];
+                        const tglStr = tglBongkar !== 'Belum Bongkar' ? format(new Date(tglBongkar), 'dd/MM/yyyy') : tglBongkar;
                         const hrg = groupPrices[key] !== undefined ? groupPrices[key] : groupTrips[0].harga_trip;
                         const vol = groupTrips.reduce((s, t) => s + t.volume, 0);
                         return (
                           <div key={key} className="flex justify-between text-sm text-muted-foreground ml-2">
-                            <span>- {getKuariName(groupTrips[0].lokasi_kuari_id)} (Vol: {vol.toLocaleString('id-ID')} m³) x Rp {hrg.toLocaleString('id-ID')}</span>
+                            <span>- {tglStr} | {getKuariName(groupTrips[0].lokasi_kuari_id)} (Vol: {vol.toLocaleString('id-ID')} m³) x Rp {hrg.toLocaleString('id-ID')}</span>
                             <span>= Rp {(vol * hrg).toLocaleString('id-ID')}</span>
                           </div>
                         );
@@ -489,11 +496,14 @@ export default function Slips() {
                     <div className="space-y-2 mb-4 border-t border-primary/20 pt-4">
                       <p className="font-semibold text-sm text-destructive">Rincian Potongan Material:</p>
                       {Object.entries(groupedTrips).map(([key, groupTrips]) => {
+                        const parts = key.split('|');
+                        const tglBongkar = parts[0];
+                        const tglStr = tglBongkar !== 'Belum Bongkar' ? format(new Date(tglBongkar), 'dd/MM/yyyy') : tglBongkar;
                         const ptg = groupDeductions[key] || 0;
                         if (ptg === 0) return null;
                         return (
                           <div key={key} className="flex justify-between text-sm text-muted-foreground ml-2">
-                            <span>- {getKuariName(groupTrips[0].lokasi_kuari_id)} ({groupTrips.length} Rit) x Rp {ptg.toLocaleString('id-ID')}</span>
+                            <span>- {tglStr} | {getKuariName(groupTrips[0].lokasi_kuari_id)} ({groupTrips.length} Rit) x Rp {ptg.toLocaleString('id-ID')}</span>
                             <span className="text-destructive">= Rp {(groupTrips.length * ptg).toLocaleString('id-ID')}</span>
                           </div>
                         );
