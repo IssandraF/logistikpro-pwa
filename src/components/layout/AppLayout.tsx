@@ -91,7 +91,7 @@ export default function AppLayout() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
         {/* Top Header Mobile (Profile) */}
-        <div className="md:hidden border-b bg-card p-3 flex items-center justify-between shrink-0">
+        <div className="md:hidden print:hidden border-b bg-card p-3 flex items-center justify-between shrink-0">
           <h1 className="text-lg font-bold text-primary truncate">{settings?.companyName || 'LogistikPro'}</h1>
           <Link to="/app/settings">
             <div className="w-8 h-8 rounded-full bg-muted border flex items-center justify-center overflow-hidden">

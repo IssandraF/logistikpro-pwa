@@ -208,7 +208,6 @@ export default function PrintInvoice({
       {/* REKAP DETAIL PER LOKASI */}
       {Object.entries(groupedByLokasiName).map(([lokasi, tripsLokasi]) => (
         <div key={lokasi} className="page-break-before-always" style={{ pageBreakBefore: 'always', marginTop: '40px' }}>
-          <div className="page-break" />
           <div className="text-center font-bold text-[14px] mb-2 leading-relaxed">
             REKAP PENGIRIMAN CBM KE {proyek.nama_proyek.toUpperCase()}<br />
             PENGIRIM {owner.nama.toUpperCase()}
@@ -279,7 +278,6 @@ export default function PrintInvoice({
       {/* FOTO BUKTI DO */}
       {includePhotos && (
         <div className="page-break-before-always" style={{ pageBreakBefore: 'always', marginTop: '40px' }}>
-          <div className="page-break" />
           <div className="text-center font-bold text-[14px] mb-5 underline">
             LAMPIRAN BUKTI DELIVERY ORDER (DO)
           </div>

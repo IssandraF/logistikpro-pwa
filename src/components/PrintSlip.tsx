@@ -140,7 +140,6 @@ export default function PrintSlip({
       </table>
 
       <div className="page-break-before-always" style={{ pageBreakBefore: 'always', marginTop: '40px' }}>
-        <div className="page-break" />
         <div className="text-center font-bold text-[14px] mb-5 underline">
           LAMPIRAN RINCIAN PER TRIP
         </div>
