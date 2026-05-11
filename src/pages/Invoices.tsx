@@ -44,6 +44,9 @@ export default function Invoices() {
     [invoiceToPrint]
   );
   
+  const [paperSize, setPaperSize] = useState('A4 portrait');
+  const [printScale, setPrintScale] = useState(100);
+  
   // Edit State
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editInvId, setEditInvId] = useState<number | null>(null);
@@ -443,6 +446,24 @@ export default function Invoices() {
               {includePhotos ? 'Foto Bukti DO Akan Dilampirkan' : 'Sertakan Foto Bukti DO?'}
             </Button>
           </div>
+          <div className="grid grid-cols-2 gap-4 mt-2">
+            <div className="space-y-2">
+              <Label>Ukuran Kertas</Label>
+              <Select value={paperSize} onValueChange={setPaperSize}>
+                <SelectTrigger><SelectValue placeholder="Pilih Ukuran" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A4 portrait">A4 Portrait</SelectItem>
+                  <SelectItem value="A4 landscape">A4 Landscape</SelectItem>
+                  <SelectItem value="Legal portrait">Legal Portrait (F4)</SelectItem>
+                  <SelectItem value="Legal landscape">Legal Landscape</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Skala Cetak (%)</Label>
+              <Input type="number" min="50" max="150" value={printScale} onChange={(e) => setPrintScale(Number(e.target.value))} />
+            </div>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPrintModalOpen(false)}>Batal</Button>
             <Button onClick={executePrint}><Printer className="w-4 h-4 mr-2" /> Proses Cetak PDF</Button>
@@ -490,6 +511,8 @@ export default function Invoices() {
           lokasiProyeks={lokasiProyeks || []}
           lokasiKuaris={lokasiKuaris || []}
           includePhotos={includePhotos}
+          paperSize={paperSize}
+          printScale={printScale}
         />
       )}
     </div>

@@ -514,7 +514,7 @@ export default function Trips() {
                 </div>
                 <div className="space-y-2">
                   <Label>Foto Bukti DO / Timbangan</Label>
-                  <Input type="file" accept="image/*" capture="environment" onChange={handlePhotoUpload} />
+                  <Input type="file" accept="image/*" onChange={handlePhotoUpload} />
                   {photo && <img src={photo} alt="Preview" className="h-24 w-24 object-cover rounded mt-2" />}
                 </div>
               </div>

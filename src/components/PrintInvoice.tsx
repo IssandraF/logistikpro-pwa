@@ -12,6 +12,8 @@ interface PrintInvoiceProps {
   lokasiProyeks: LokasiProyek[];
   lokasiKuaris: LokasiKuari[];
   includePhotos: boolean;
+  paperSize?: string;
+  printScale?: number;
 }
 
 export default function PrintInvoice({
@@ -22,7 +24,9 @@ export default function PrintInvoice({
   proyekLokasis,
   lokasiProyeks,
   lokasiKuaris,
-  includePhotos
+  includePhotos,
+  paperSize = 'A4 portrait',
+  printScale = 100
 }: PrintInvoiceProps) {
 
   // Sort Summary Grouped by Muat|Bongkar|Lokasi
@@ -68,6 +72,17 @@ export default function PrintInvoice({
 
   return (
     <div className="hidden print:block printable-invoice">
+      <style type="text/css" media="print">
+        {`
+          @page {
+            size: ${paperSize} !important;
+            margin: 5mm;
+          }
+          .printable-invoice {
+            zoom: ${printScale / 100} !important;
+          }
+        `}
+      </style>
       <div className="text-center font-bold underline mb-5 text-[16px]">INVOICE</div>
 
       <table className="info-table w-full mb-5 border-none">

@@ -277,18 +277,37 @@ export default function Slips() {
     aoa.push([`NOMOR SLIP: ${slip.nomor_slip}`]);
     aoa.push([`TANGGAL: ${format(new Date(slip.tanggal), 'dd-MM-yyyy')}`]);
     aoa.push([]); // empty
-    
-    aoa.push(['NO', 'TGL BONGKAR', 'PLAT NOMOR', 'VOLUME', 'HARGA/M3', 'TOTAL HARGA']);
-    
-    invTrips.forEach((t, idx) => {
-      aoa.push([
-        idx + 1,
-        format(new Date(t.tanggal_bongkar), 'dd-MM-yyyy'),
-        t.plat_nomor,
-        t.volume,
-        t.harga_bayar,
-        t.volume * (t.harga_bayar || t.harga_trip)
-      ]);
+    const groupedExcelTrips = invTrips.reduce((acc, t) => {
+      const key = t.lokasi_kuari_id;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(t);
+      return acc;
+    }, {} as Record<number, typeof invTrips>);
+
+    Object.entries(groupedExcelTrips).forEach(([kId, trips]) => {
+      const kuariName = getKuariName(Number(kId));
+      aoa.push([`LOKASI MUAT: ${kuariName.toUpperCase()}`]);
+      aoa.push(['NO', 'TGL BONGKAR', 'PLAT NOMOR', 'VOLUME', 'HARGA/M3', 'TOTAL HARGA']);
+      
+      let subTotalVol = 0;
+      let subTotalHarga = 0;
+
+      trips.forEach((t, idx) => {
+        const totalHarga = t.volume * (t.harga_bayar || t.harga_trip);
+        subTotalVol += t.volume;
+        subTotalHarga += totalHarga;
+        aoa.push([
+          idx + 1,
+          format(new Date(t.tanggal_bongkar), 'dd-MM-yyyy'),
+          t.plat_nomor,
+          t.volume,
+          t.harga_bayar || t.harga_trip,
+          totalHarga
+        ]);
+      });
+      
+      aoa.push(['', '', 'SUBTOTAL', subTotalVol, '', subTotalHarga]);
+      aoa.push([]); // empty line between groups
     });
     
     aoa.push([]);
