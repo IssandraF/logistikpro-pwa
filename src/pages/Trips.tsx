@@ -57,6 +57,50 @@ export default function Trips() {
   }
   const [massRows, setMassRows] = useState<MassRow[]>([{ id: 1, plat_nomor: '', volume: '', grup_mobil_id: '' }]);
 
+  // Filter View State
+  const [viewSearch, setViewSearch] = useState('');
+  const [viewFilterGrup, setViewFilterGrup] = useState('all');
+  const [viewFilterProyek, setViewFilterProyek] = useState('all');
+  const [viewFilterTglStart, setViewFilterTglStart] = useState('');
+  const [viewFilterTglEnd, setViewFilterTglEnd] = useState('');
+
+  const displayedTrips = useMemo(() => {
+    if (!trips) return [];
+    let result = [...trips];
+
+    if (viewSearch) {
+      const lower = viewSearch.toLowerCase();
+      result = result.filter(t => 
+        t.plat_nomor.toLowerCase().includes(lower) || 
+        (grupMobils?.find(g => g.id === t.grup_mobil_id)?.nama_grup || '').toLowerCase().includes(lower) ||
+        (kuaris?.find(k => k.id === t.lokasi_kuari_id)?.nama_lokasi || '').toLowerCase().includes(lower)
+      );
+    }
+
+    if (viewFilterGrup && viewFilterGrup !== 'all') {
+      result = result.filter(t => t.grup_mobil_id.toString() === viewFilterGrup);
+    }
+
+    if (viewFilterProyek && viewFilterProyek !== 'all') {
+      const allowedPlIds = proyekLokasis?.filter(pl => pl.proyek_id.toString() === viewFilterProyek).map(pl => pl.id) || [];
+      result = result.filter(t => allowedPlIds.includes(t.proyek_lokasi_id));
+    }
+
+    if (viewFilterTglStart) {
+      const start = new Date(viewFilterTglStart);
+      start.setHours(0, 0, 0, 0);
+      result = result.filter(t => new Date(t.tanggal_bongkar) >= start);
+    }
+
+    if (viewFilterTglEnd) {
+      const end = new Date(viewFilterTglEnd);
+      end.setHours(23, 59, 59, 999);
+      result = result.filter(t => new Date(t.tanggal_bongkar) <= end);
+    }
+
+    return result;
+  }, [trips, viewSearch, viewFilterGrup, viewFilterProyek, viewFilterTglStart, viewFilterTglEnd, grupMobils, kuaris, proyekLokasis]);
+
   // Filter Print / Excel State
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [actionType, setActionType] = useState<'print' | 'excel'>('print');
@@ -412,6 +456,45 @@ export default function Trips() {
               </div>
             </CardHeader>
             <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+                <Input 
+                  placeholder="Cari plat, grup, atau kuari..." 
+                  value={viewSearch} 
+                  onChange={e => setViewSearch(e.target.value)} 
+                />
+                <Select value={viewFilterGrup} onValueChange={setViewFilterGrup}>
+                  <SelectTrigger><SelectValue placeholder="Semua Grup" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Grup</SelectItem>
+                    {grupMobils?.map(g => <SelectItem key={g.id} value={g.id!.toString()}>{g.nama_grup}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={viewFilterProyek} onValueChange={setViewFilterProyek}>
+                  <SelectTrigger><SelectValue placeholder="Semua Proyek" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Proyek</SelectItem>
+                    {proyeks?.map(p => <SelectItem key={p.id} value={p.id!.toString()}>{p.nama_proyek}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <div className="flex gap-2 items-center">
+                  <Input 
+                    type="date" 
+                    value={viewFilterTglStart} 
+                    onChange={e => setViewFilterTglStart(e.target.value)} 
+                    title="Mulai Tanggal"
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex gap-2 items-center">
+                  <Input 
+                    type="date" 
+                    value={viewFilterTglEnd} 
+                    onChange={e => setViewFilterTglEnd(e.target.value)} 
+                    title="Sampai Tanggal"
+                    className="w-full"
+                  />
+                </div>
+              </div>
               <div className="overflow-x-auto border rounded-lg">
                 <table className="w-full text-sm text-left">
                   <thead className="bg-muted border-b">
@@ -425,7 +508,7 @@ export default function Trips() {
                     </tr>
                   </thead>
                   <tbody>
-                    {trips?.slice(0, 100).map(t => (
+                    {displayedTrips?.slice(0, 100).map(t => (
                       <tr key={t.id} className="border-b">
                         <td className="p-3">{format(new Date(t.tanggal_bongkar), 'dd/MM/yyyy')}</td>
                         <td className="p-3 font-medium">
@@ -443,11 +526,11 @@ export default function Trips() {
                         </td>
                       </tr>
                     ))}
-                    {trips?.length === 0 && <tr><td colSpan={6} className="p-4 text-center">Belum ada trip</td></tr>}
+                    {displayedTrips?.length === 0 && <tr><td colSpan={6} className="p-4 text-center">Belum ada trip</td></tr>}
                   </tbody>
                 </table>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">Menampilkan maksimal 100 trip terakhir. Gunakan export excel untuk melihat keseluruhan.</p>
+              <p className="text-xs text-muted-foreground mt-2">Menampilkan maksimal 100 trip dari total {displayedTrips?.length || 0} data. Gunakan export excel untuk melihat keseluruhan.</p>
             </CardContent>
           </Card>
         </TabsContent>
