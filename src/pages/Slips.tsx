@@ -342,7 +342,7 @@ export default function Slips() {
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6 print:hidden">Slip Pembayaran Vendor</h1>
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="print:hidden">
         <TabsList className="mb-4">
           <TabsTrigger value="data">Data Slip</TabsTrigger>
           <TabsTrigger value="create">Buat Slip Baru</TabsTrigger>

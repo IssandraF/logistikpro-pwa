@@ -49,7 +49,7 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Sidebar (Desktop) */}
-      <aside className="w-64 border-r bg-card hidden md:flex flex-col">
+      <aside className="w-64 border-r bg-card hidden md:flex flex-col print:hidden">
         <div className="p-6">
           <h1 className="text-2xl font-bold text-primary">LogistikPro</h1>
         </div>
@@ -110,7 +110,7 @@ export default function AppLayout() {
       </main>
 
       {/* Bottom Nav (Mobile) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 border-t bg-card flex overflow-x-auto no-scrollbar p-2 pb-safe">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 border-t bg-card flex overflow-x-auto no-scrollbar p-2 pb-safe print:hidden">
         {navItems.filter(item => item.path !== '/app/settings').map(item => (
           <Link
             key={item.path}
