@@ -14,6 +14,7 @@ interface PrintInvoiceProps {
   includePhotos: boolean;
   paperSize?: string;
   printScale?: number;
+  isPreview?: boolean;
 }
 
 export default function PrintInvoice({
@@ -26,7 +27,8 @@ export default function PrintInvoice({
   lokasiKuaris,
   includePhotos,
   paperSize = 'A4 portrait',
-  printScale = 100
+  printScale = 100,
+  isPreview = false
 }: PrintInvoiceProps) {
 
   // Sort Summary Grouped by Muat|Bongkar|Lokasi
@@ -71,7 +73,7 @@ export default function PrintInvoice({
   let lastDateCbm: string | null = null;
 
   return (
-    <div className="hidden print:block printable-invoice">
+    <div className={isPreview ? "printable-invoice bg-white text-black p-8 w-full max-w-4xl mx-auto" : "hidden print:block printable-invoice"}>
       <style type="text/css" media="print">
         {`
           @page {
@@ -136,7 +138,7 @@ export default function PrintInvoice({
             lastDateCbm = currentDateCombo;
 
             const totalVol = items.reduce((sum, t) => sum + t.volume, 0);
-            const totalHarga = items.reduce((sum, t) => sum + t.total_harga, 0);
+            const totalHarga = totalVol * first.harga_trip;
 
             return (
               <tr key={key}>

@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { FileText, Printer, FileDown, CheckSquare, Image as ImageIcon, Trash2, Edit } from 'lucide-react';
+import { Eye, FileText, Printer, FileDown, CheckSquare, Image as ImageIcon, Trash2, Edit } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import PrintInvoice from '@/components/PrintInvoice';
@@ -36,6 +36,7 @@ export default function Invoices() {
 
   // Print States
   const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [invoiceToPrint, setInvoiceToPrint] = useState<any>(null);
   const [includePhotos, setIncludePhotos] = useState(false);
@@ -242,6 +243,13 @@ export default function Invoices() {
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handlePreviewClick = (inv: any) => {
+    setInvoiceToPrint(inv);
+    setIncludePhotos(true);
+    setPreviewModalOpen(true);
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handlePrintClick = (inv: any) => {
     setInvoiceToPrint(inv);
     setIncludePhotos(false);
@@ -299,6 +307,9 @@ export default function Invoices() {
                         <td className="p-3 flex gap-2">
                           <Button variant="outline" size="sm" onClick={() => exportExcelSingle(inv)}>
                             <FileDown className="w-4 h-4 text-green-600" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handlePreviewClick(inv)}>
+                            <Eye className="w-4 h-4 text-purple-600" />
                           </Button>
                           <Button variant="outline" size="sm" onClick={() => handlePrintClick(inv)}>
                             <Printer className="w-4 h-4 text-blue-600" />
@@ -496,6 +507,38 @@ export default function Invoices() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditModalOpen(false)}>Batal</Button>
             <Button onClick={handleUpdateInvoice}>Simpan Perubahan</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Modal */}
+      <Dialog open={previewModalOpen} onOpenChange={setPreviewModalOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto bg-gray-100">
+          <DialogHeader className="mb-4">
+            <DialogTitle>Preview Invoice {invoiceToPrint?.nomor_invoice}</DialogTitle>
+          </DialogHeader>
+          
+          <div className="bg-white rounded shadow-sm border border-gray-200">
+             {invoiceToPrint && tripsForPrint && selectedOwner && selectedProyek && (
+                <PrintInvoice
+                  invoice={invoiceToPrint}
+                  trips={tripsForPrint}
+                  owner={selectedOwner}
+                  proyek={selectedProyek}
+                  proyekLokasis={proyekLokasis || []}
+                  lokasiProyeks={lokasiProyeks || []}
+                  lokasiKuaris={lokasiKuaris || []}
+                  includePhotos={includePhotos}
+                  paperSize={paperSize}
+                  printScale={printScale}
+                  isPreview={true}
+                />
+              )}
+          </div>
+          
+          <DialogFooter className="mt-4">
+             <Button variant="outline" onClick={() => setPreviewModalOpen(false)}>Tutup</Button>
+             <Button onClick={() => { setPreviewModalOpen(false); executePrint(); }}><Printer className="w-4 h-4 mr-2"/> Cetak Sekarang</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
