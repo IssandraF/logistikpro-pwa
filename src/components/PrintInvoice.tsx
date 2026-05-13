@@ -284,22 +284,30 @@ export default function PrintInvoice({
             LAMPIRAN BUKTI DELIVERY ORDER (DO)
           </div>
 
-          <div className="flex flex-wrap w-full">
-            {(() => {
-              // Flat all trips that have images
-              const tripsWithPhotos = trips.filter(t => t.bukti_do);
-              return tripsWithPhotos.map((trip) => (
-                <div key={trip.id} className="w-[50%] p-2 text-center border border-dashed border-gray-300">
-                  <div className="font-bold text-[11px] mb-1">
-                    {trip.plat_nomor} - {format(new Date(trip.tanggal_bongkar), 'dd/MM/yyyy')}
+          <div className="w-full">
+            {Object.entries(groupedByLokasiName).map(([lokasi, tripsLokasi]) => {
+              const tripsWithPhotos = tripsLokasi.filter(t => t.bukti_do);
+              if (tripsWithPhotos.length === 0) return null;
+
+              return (
+                <div key={lokasi} className="mb-6 w-full">
+                  <div className="font-bold mb-2 p-1 border-b-2 border-black text-sm">LOKASI BONGKARAN: {lokasi}</div>
+                  <div className="flex flex-wrap w-full">
+                    {tripsWithPhotos.map((trip) => (
+                      <div key={trip.id} className="w-[50%] p-2 text-center border border-dashed border-gray-300">
+                        <div className="font-bold text-[11px] mb-1">
+                          {trip.plat_nomor} - {format(new Date(trip.tanggal_bongkar), 'dd/MM/yyyy')}
+                        </div>
+                        <div className="text-[10px] mb-2">
+                          Vol: {trip.volume} M³ | Muat: {getKuariName(trip.lokasi_kuari_id)}
+                        </div>
+                        <img src={trip.bukti_do} className="max-w-[90%] max-h-[250px] object-contain border border-gray-200 p-[2px] mx-auto" />
+                      </div>
+                    ))}
                   </div>
-                  <div className="text-[10px] mb-2">
-                    Vol: {trip.volume} M³ | Lok: {getLokasiName(trip.proyek_lokasi_id)}
-                  </div>
-                  <img src={trip.bukti_do} className="max-w-[90%] max-h-[250px] object-contain border border-gray-200 p-[2px] mx-auto" />
                 </div>
-              ));
-            })()}
+              );
+            })}
           </div>
         </div>
       )}
