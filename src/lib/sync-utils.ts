@@ -128,14 +128,26 @@ export const importSmartTrips = async (file: File) => {
       const slipId = row.rel_slip_nomor ? allSlips.find(s => safeTrimLower(s.nomor_slip) === safeTrimLower(row.rel_slip_nomor))?.id : null;
 
       // Check for duplication: same plat, same tanggal_bongkar, same volume
-      const isDuplicate = allTrips.some(t => 
+      const duplicateTrip = allTrips.find(t => 
         safeTrimLower(t.plat_nomor) === safeTrimLower(row.plat_nomor) &&
         new Date(t.tanggal_bongkar).getTime() === new Date(row.tanggal_bongkar).getTime() &&
         t.volume === row.volume
       );
 
-      if (isDuplicate) {
-        skipped++;
+      if (duplicateTrip) {
+        if (duplicateTrip.isDeleted === 1) {
+          // Trip was deleted in UI, restore it
+          await db.trips.update(duplicateTrip.id!, { 
+            isDeleted: 0,
+            grup_mobil_id: grupId || 0,
+            lokasi_kuari_id: kuariId || 0,
+            jenis_jasa_id: jasaId || 0,
+            proyek_lokasi_id: plId || 0,
+          });
+          imported++;
+        } else {
+          skipped++;
+        }
         continue;
       }
 
@@ -210,10 +222,23 @@ export const importSmartInvoices = async (file: File) => {
     const allInvoices = await db.invoices.toArray();
 
     for (const row of data) {
-      // Check duplicate by nomor_invoice
-      const existing = allInvoices.find(i => safeTrimLower(i.nomor_invoice) === safeTrimLower(row.nomor_invoice));
-      if (existing) {
-        skipped++;
+      // Check for duplication: same nomor_invoice
+      const duplicateInvoice = allInvoices.find(i => safeTrimLower(i.nomor_invoice) === safeTrimLower(row.nomor_invoice));
+
+      if (duplicateInvoice) {
+        if (duplicateInvoice.isDeleted === 1) {
+          // Invoice was deleted in UI, restore it
+          const pId = await findOrCreateByName(db.proyeks, 'nama_proyek', row.rel_proyek_nama);
+          const oId = await findOrCreateByName(db.owners, 'nama', row.rel_owner_nama);
+          await db.invoices.update(duplicateInvoice.id!, { 
+            isDeleted: 0,
+            proyek_id: pId || 0,
+            owner_id: oId || 0
+          });
+          imported++;
+        } else {
+          skipped++;
+        }
         continue;
       }
 
