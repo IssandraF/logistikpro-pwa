@@ -85,6 +85,7 @@ export interface Trip {
   invoice_id: number | null;
   slip_pembayaran_id: number | null;
   harga_bayar?: number; // diisi ketika dibuat slip pembayaran
+  potongan_trip?: number; // potongan material per trip ketika dibuat slip
   createdAt: Date;
   isDeleted: number;
 }

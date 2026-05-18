@@ -137,6 +137,7 @@ export default function Slips() {
         const key = `${tglBongkar}|${t.proyek_lokasi_id}|${t.lokasi_kuari_id}`;
         t.slip_pembayaran_id = Number(slipId);
         t.harga_bayar = groupPrices[key] !== undefined ? groupPrices[key] : t.harga_trip;
+        t.potongan_trip = groupDeductions[key] || 0;
       });
 
       // 3. Handle Kasbon Mutasi

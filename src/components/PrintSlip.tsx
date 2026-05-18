@@ -204,12 +204,35 @@ export default function PrintSlip({
                       <td className="text-right pr-2 font-bold">Rp {(t.volume * (t.harga_bayar || 0)).toLocaleString('id-ID')}</td>
                     </tr>
                   ))}
-                  <tr className="bg-[#f0f0f0] font-bold">
-                    <td colSpan={2} className="text-center">SUBTOTAL ({tripsSorted.length} Rit)</td>
-                    <td className="text-center">{tripsSorted.reduce((s, x) => s + x.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="text-center">-</td>
-                    <td className="text-right pr-2 text-green-700">Rp {tripsSorted.reduce((s, x) => s + (x.volume * (x.harga_bayar || 0)), 0).toLocaleString('id-ID')}</td>
-                  </tr>
+                  {(() => {
+                    const volSum = tripsSorted.reduce((s, x) => s + x.volume, 0);
+                    const subTotalKotor = tripsSorted.reduce((s, x) => s + (x.volume * (x.harga_bayar || 0)), 0);
+                    const groupPotongan = tripsSorted.reduce((s, x) => s + (x.potongan_trip || 0), 0);
+                    const potonganSatuRit = tripsSorted[0]?.potongan_trip || 0;
+
+                    return (
+                      <>
+                        <tr className="bg-[#f0f0f0] font-bold">
+                          <td colSpan={2} className="text-center">SUBTOTAL KOTOR ({tripsSorted.length} Rit)</td>
+                          <td className="text-center">{volSum.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="text-center">-</td>
+                          <td className="text-right pr-2">Rp {subTotalKotor.toLocaleString('id-ID')}</td>
+                        </tr>
+                        {groupPotongan > 0 && (
+                          <tr className="bg-[#ffebee] font-bold text-red-600">
+                            <td colSpan={4} className="text-right pr-2">POTONGAN MATERIAL ({tripsSorted.length} Rit x Rp {potonganSatuRit.toLocaleString('id-ID')}) (-)</td>
+                            <td className="text-right pr-2">- Rp {groupPotongan.toLocaleString('id-ID')}</td>
+                          </tr>
+                        )}
+                        {groupPotongan > 0 && (
+                          <tr className="bg-[#e0f7fa] font-bold">
+                            <td colSpan={4} className="text-right pr-2">SUBTOTAL BERSIH KELOMPOK</td>
+                            <td className="text-right pr-2 text-green-700">Rp {(subTotalKotor - groupPotongan).toLocaleString('id-ID')}</td>
+                          </tr>
+                        )}
+                      </>
+                    );
+                  })()}
                 </tbody>
               </table>
             </div>
