@@ -46,8 +46,13 @@ export const findOrCreateProyekLokasi = async (proyekName: string, lokasiName: s
 
 // --- TRIPS ---
 
-export const exportSmartTrips = async () => {
-  const trips = await db.trips.toArray();
+export const exportSmartTrips = async (tripIds?: number[]) => {
+  let trips = [];
+  if (tripIds && tripIds.length > 0) {
+    trips = await db.trips.where('id').anyOf(tripIds).toArray();
+  } else {
+    trips = await db.trips.toArray();
+  }
   
   // Cache masters to speed up mapping
   const grupMobils = await db.grupMobils.toArray();

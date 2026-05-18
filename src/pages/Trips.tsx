@@ -383,10 +383,11 @@ export default function Trips() {
   };
 
   // Smart Sync
-  const handleExportTrips = async () => {
+  const handleExportTrips = async (selectedOnly: boolean = false) => {
     try {
       toast.info('Menyiapkan file ekspor...');
-      await exportSmartTrips();
+      const idsToExport = selectedOnly ? selectedTrips : undefined;
+      await exportSmartTrips(idsToExport);
       toast.success('File ekspor berhasil diunduh');
     } catch {
       toast.error('Gagal mengekspor data');
@@ -521,7 +522,7 @@ export default function Trips() {
                 <Button variant="outline" size="sm" onClick={() => handleOpenFilter('excel')}><Download className="w-4 h-4 mr-2" /> Excel</Button>
                 <Button variant="outline" size="sm" onClick={() => handleOpenFilter('print')}><Printer className="w-4 h-4 mr-2" /> Print PDF</Button>
                 <div className="w-px h-6 bg-border mx-1 hidden sm:block"></div>
-                <Button variant="secondary" size="sm" onClick={handleExportTrips}><DownloadCloud className="w-4 h-4 mr-2" /> Smart Export</Button>
+                <Button variant="secondary" size="sm" onClick={() => handleExportTrips(false)}><DownloadCloud className="w-4 h-4 mr-2" /> Smart Export (Semua)</Button>
                 <input type="file" id="import-trips" className="hidden" accept=".json" onChange={handleImportTrips} />
                 <Label htmlFor="import-trips" className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3">
                   <UploadCloud className="w-4 h-4 mr-2" /> Smart Import
@@ -570,9 +571,12 @@ export default function Trips() {
               </div>
 
               {selectedTrips.length > 0 && (
-                <div className="flex items-center gap-4 bg-primary/10 p-3 rounded-lg border border-primary/20 mb-4 animate-in slide-in-from-top-2">
+                <div className="flex items-center gap-4 bg-primary/10 p-3 rounded-lg border border-primary/20 mb-4 animate-in slide-in-from-top-2 flex-wrap">
                   <span className="font-semibold text-primary">{selectedTrips.length} Trip Dipilih</span>
                   <Button size="sm" onClick={() => setInvoiceSelectModalOpen(true)}>Tambahkan ke Invoice</Button>
+                  <Button size="sm" variant="secondary" onClick={() => handleExportTrips(true)}>
+                    <DownloadCloud className="w-4 h-4 mr-2" /> Export Terpilih
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={() => setSelectedTrips([])}>Batal</Button>
                 </div>
               )}
