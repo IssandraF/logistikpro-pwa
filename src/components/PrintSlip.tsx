@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { generateTerbilangText } from "@/lib/print-utils";
-import type { SlipPembayaran, Trip, GrupMobil, ProyekLokasi, LokasiProyek } from "@/lib/db";
+import type { SlipPembayaran, Trip, GrupMobil, ProyekLokasi, LokasiProyek, LokasiKuari } from "@/lib/db";
 
 interface PrintSlipProps {
   slip: SlipPembayaran;
@@ -9,6 +9,7 @@ interface PrintSlipProps {
   grupMobil: GrupMobil;
   proyekLokasis: ProyekLokasi[];
   lokasiProyeks: LokasiProyek[];
+  lokasiKuaris: LokasiKuari[];
 }
 
 export default function PrintSlip({
@@ -16,10 +17,11 @@ export default function PrintSlip({
   trips,
   grupMobil,
   proyekLokasis,
-  lokasiProyeks
+  lokasiProyeks,
+  lokasiKuaris
 }: PrintSlipProps) {
   
-  // Rute group calculation (for the summary table)
+  // Rute group calculation (for the main summary table)
   const groupedTrips: Record<string, Trip[]> = {};
   trips.forEach(t => {
     const pl = proyekLokasis.find(x => x.id === t.proyek_lokasi_id);
@@ -28,6 +30,30 @@ export default function PrintSlip({
     
     if (!groupedTrips[rute]) groupedTrips[rute] = [];
     groupedTrips[rute].push(t);
+  });
+
+  // Lampiran grouping by Tanggal, Lokasi Bongkar, Asal Kuari
+  const lampiranGrouped: Record<string, Trip[]> = {};
+  trips.forEach(t => {
+    const tgl = t.tanggal_bongkar ? format(new Date(t.tanggal_bongkar), 'yyyy-MM-dd') : 'Belum Bongkar';
+    const pl = proyekLokasis.find(x => x.id === t.proyek_lokasi_id);
+    const loc = pl ? lokasiProyeks.find(x => x.id === pl.lokasi_proyek_id) : null;
+    const rute = loc ? loc.nama_lokasi : 'TIDAK DIKETAHUI';
+    const kuari = lokasiKuaris.find(x => x.id === t.lokasi_kuari_id);
+    const namaKuari = kuari ? kuari.nama_lokasi : 'TIDAK DIKETAHUI';
+
+    const key = `${tgl}|${rute}|${namaKuari}`;
+    if (!lampiranGrouped[key]) lampiranGrouped[key] = [];
+    lampiranGrouped[key].push(t);
+  });
+
+  // Sort Lampiran Keys
+  const lampiranKeys = Object.keys(lampiranGrouped).sort((a, b) => {
+    const [tglA, ruteA, kuariA] = a.split('|');
+    const [tglB, ruteB, kuariB] = b.split('|');
+    if (tglA !== tglB) return tglA.localeCompare(tglB);
+    if (ruteA !== ruteB) return ruteA.localeCompare(ruteB);
+    return kuariA.localeCompare(kuariB);
   });
 
   // Calculate min and max dates
@@ -80,7 +106,7 @@ export default function PrintSlip({
         <tbody>
           {Object.entries(groupedTrips).map(([rute, routeTrips], idx) => {
             const volTotal = routeTrips.reduce((sum, t) => sum + t.volume, 0);
-            const hargaSatu = routeTrips[0].harga_bayar;
+            const hargaSatu = routeTrips[0].harga_bayar || 0;
             const subtot = volTotal * hargaSatu;
             return (
               <tr key={rute}>
@@ -144,47 +170,80 @@ export default function PrintSlip({
           LAMPIRAN RINCIAN PER TRIP
         </div>
 
-        {Object.entries(groupedTrips).map(([lokasi, tripsInLokasi]) => {
-          const tripsSorted = [...tripsInLokasi].sort((a, b) => a.plat_nomor.localeCompare(b.plat_nomor));
+        {lampiranKeys.map((key) => {
+          const [tglStr, rute, kuari] = key.split('|');
+          const tglFormat = tglStr !== 'Belum Bongkar' ? format(new Date(tglStr), 'dd MMMM yyyy', { locale: id }) : tglStr;
+          const tripsInGroup = lampiranGrouped[key];
+          const tripsSorted = [...tripsInGroup].sort((a, b) => a.plat_nomor.localeCompare(b.plat_nomor));
           let noTripLokasi = 1;
 
           return (
-            <div key={lokasi}>
-              <div className="font-bold mb-1 pt-2">LOKASI BONGKAR: {lokasi.toUpperCase()}</div>
+            <div key={key} className="mb-6">
+              <div className="font-bold mb-1 pt-2 text-sm">
+                TANGGAL BONGKAR: {tglFormat.toUpperCase()} <br/>
+                LOKASI BONGKAR: {rute.toUpperCase()} | ASAL KUARI: {kuari.toUpperCase()}
+              </div>
               
-              <table className="table-bordered info-table w-full mb-5">
+              <table className="table-bordered info-table w-full">
                 <thead className="bg-[#00B0F0] text-black">
                   <tr>
                     <th className="w-[5%]">NO</th>
-                    <th className="w-[15%]">TANGGAL</th>
-                    <th className="w-[15%]">PLAT NOMOR</th>
-                    <th className="w-[15%]">VOLUME (M3)</th>
-                    <th className="w-[15%]">HARGA/M3</th>
-                    <th className="w-[15%]">SUBTOTAL</th>
+                    <th className="w-[20%]">PLAT NOMOR</th>
+                    <th className="w-[20%]">VOLUME (M3)</th>
+                    <th className="w-[25%]">HARGA/M3</th>
+                    <th className="w-[30%]">SUBTOTAL</th>
                   </tr>
                 </thead>
                 <tbody>
                   {tripsSorted.map(t => (
                     <tr key={t.id}>
                       <td className="text-center">{noTripLokasi++}</td>
-                      <td className="text-center">{format(new Date(t.tanggal_bongkar), 'dd/MM/yyyy')}</td>
                       <td className="text-center font-bold">{t.plat_nomor}</td>
                       <td className="text-center">{t.volume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="text-right pr-2">Rp {t.harga_bayar.toLocaleString('id-ID')}</td>
-                      <td className="text-right pr-2 font-bold">Rp {(t.volume * t.harga_bayar).toLocaleString('id-ID')}</td>
+                      <td className="text-right pr-2">Rp {(t.harga_bayar || 0).toLocaleString('id-ID')}</td>
+                      <td className="text-right pr-2 font-bold">Rp {(t.volume * (t.harga_bayar || 0)).toLocaleString('id-ID')}</td>
                     </tr>
                   ))}
                   <tr className="bg-[#f0f0f0] font-bold">
-                    <td colSpan={3} className="text-center">SUBTOTAL LOKASI {lokasi.toUpperCase()} ({tripsSorted.length} Rit)</td>
+                    <td colSpan={2} className="text-center">SUBTOTAL ({tripsSorted.length} Rit)</td>
                     <td className="text-center">{tripsSorted.reduce((s, x) => s + x.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="text-center">-</td>
-                    <td className="text-right pr-2 text-green-700">Rp {tripsSorted.reduce((s, x) => s + (x.volume * x.harga_bayar), 0).toLocaleString('id-ID')}</td>
+                    <td className="text-right pr-2 text-green-700">Rp {tripsSorted.reduce((s, x) => s + (x.volume * (x.harga_bayar || 0)), 0).toLocaleString('id-ID')}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           );
         })}
+
+        {/* Global deductions at the bottom of the lampiran */}
+        <div className="mt-8">
+           <table className="table-bordered info-table w-full">
+              <tbody>
+                  <tr className="bg-[#f9f9f9] font-bold">
+                    <td className="w-[70%] text-right pr-2">TOTAL KESELURUHAN TRIP (KOTOR)</td>
+                    <td className="w-[30%] text-right pr-2">Rp {slip.total_trip_ongkos.toLocaleString('id-ID')}</td>
+                  </tr>
+                  {slip.potongan_material > 0 && (
+                    <tr className="bg-[#ffebee] font-bold text-red-600">
+                      <td className="text-right pr-2">TOTAL POTONGAN MATERIAL / TANAH (-)</td>
+                      <td className="text-right pr-2">- Rp {slip.potongan_material.toLocaleString('id-ID')}</td>
+                    </tr>
+                  )}
+                  {slip.potongan_kasbon > 0 && (
+                    <tr className="bg-[#ffebee] font-bold text-red-600">
+                      <td className="text-right pr-2">TOTAL POTONGAN KASBON / HUTANG (-)</td>
+                      <td className="text-right pr-2">- Rp {slip.potongan_kasbon.toLocaleString('id-ID')}</td>
+                    </tr>
+                  )}
+                  <tr className="bg-[#e0f7fa] font-bold">
+                    <td className="text-right pr-2 text-[14px]">TOTAL BERSIH</td>
+                    <td className="text-right pr-2 text-[14px] text-[#00796b]">Rp {slip.total_bersih_dibayar.toLocaleString('id-ID')}</td>
+                  </tr>
+              </tbody>
+           </table>
+        </div>
+
       </div>
 
     </div>

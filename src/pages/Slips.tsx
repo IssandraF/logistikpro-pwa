@@ -27,6 +27,7 @@ export default function Slips() {
   const lokasiProyeks = useLiveQuery(() => db.lokasiProyeks.toArray());
   const kuaris = useLiveQuery(() => db.lokasiKuaris.toArray());
 
+
   const [nomorSlip, setNomorSlip] = useState('');
   const [tglSlip, setTglSlip] = useState('');
   const [grupId, setGrupId] = useState('');
@@ -588,13 +589,14 @@ export default function Slips() {
       </Dialog>
 
       {/* Hidden Print Layout */}
-      {slipToPrint && tripsForPrint && printGrupMobil && proyekLokasis && lokasiProyeks && (
+      {slipToPrint && tripsForPrint && printGrupMobil && proyekLokasis && lokasiProyeks && kuaris && (
         <PrintSlip
           slip={slipToPrint}
           trips={tripsForPrint}
           grupMobil={printGrupMobil}
           proyekLokasis={proyekLokasis}
           lokasiProyeks={lokasiProyeks}
+          lokasiKuaris={kuaris}
         />
       )}
     </div>
