@@ -140,6 +140,13 @@ export default function PrintSlip({
             <td colSpan={4} className="text-right pr-2 text-[14px]">TOTAL DIBAYARKAN (BERSIH)</td>
             <td className="text-right pr-2 text-[14px] text-[#00796b]">Rp {slip.total_bersih_dibayar.toLocaleString('id-ID')}</td>
           </tr>
+          
+          {slip.sisa_kasbon_setelah_bayar !== null && slip.sisa_kasbon_setelah_bayar !== undefined && (
+            <tr className="font-bold text-orange-600 bg-orange-50/50">
+              <td colSpan={4} className="text-right pr-2 text-[12px]">SISA HUTANG / KAS BON SAAT INI</td>
+              <td className="text-right pr-2 text-[12px]">Rp {slip.sisa_kasbon_setelah_bayar.toLocaleString('id-ID')}</td>
+            </tr>
+          )}
         </tbody>
       </table>
 
