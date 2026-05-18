@@ -12,10 +12,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { format } from 'date-fns';
 
 import { toast } from 'sonner';
-import { Download, Printer, Plus, Trash2, CheckSquare, Edit, X } from 'lucide-react';
+import { Download, Printer, Plus, Trash2, CheckSquare, Edit, UploadCloud, DownloadCloud } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import PrintRekapTrips from '@/components/PrintRekapTrips';
 import { printWithTitle } from '@/lib/print-utils';
+import { exportSmartTrips, importSmartTrips } from '@/lib/sync-utils';
 
 export default function Trips() {
   const [activeTab, setActiveTab] = useState('data');
@@ -27,6 +28,7 @@ export default function Trips() {
   const jasas = useLiveQuery(() => db.jenisJasas.where('isDeleted').equals(0).toArray());
   const proyeks = useLiveQuery(() => db.proyeks.where('isDeleted').equals(0).toArray());
   const lokasiProyeks = useLiveQuery(() => db.lokasiProyeks.where('isDeleted').equals(0).toArray());
+  const invoices = useLiveQuery(() => db.invoices.toArray());
 
   // Form State (Single)
   const [grupId, setGrupId] = useState('');
@@ -63,6 +65,11 @@ export default function Trips() {
   const [viewFilterProyek, setViewFilterProyek] = useState('all');
   const [viewFilterTglStart, setViewFilterTglStart] = useState('');
   const [viewFilterTglEnd, setViewFilterTglEnd] = useState('');
+
+  // Selection State
+  const [selectedTrips, setSelectedTrips] = useState<number[]>([]);
+  const [invoiceSelectModalOpen, setInvoiceSelectModalOpen] = useState(false);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
 
   const displayedTrips = useMemo(() => {
     if (!trips) return [];
@@ -206,6 +213,40 @@ export default function Trips() {
     });
   };
 
+  const handleAddToInvoice = async () => {
+    if (!selectedInvoiceId) return toast.error('Pilih invoice terlebih dahulu');
+    if (selectedTrips.length === 0) return toast.error('Belum ada trip yang dipilih');
+    
+    const targetInvoiceId = Number(selectedInvoiceId);
+    const oldInvoiceIds = new Set<number>();
+    
+    try {
+      toast.info('Menyimpan perubahan...', { duration: 2000 });
+      for (const tripId of selectedTrips) {
+        const trip = await db.trips.get(tripId);
+        if (trip?.invoice_id && trip.invoice_id !== targetInvoiceId) {
+          oldInvoiceIds.add(trip.invoice_id);
+        }
+        await db.trips.update(tripId, { invoice_id: targetInvoiceId });
+      }
+      
+      // Sync Target
+      await syncInvoiceTotals(targetInvoiceId);
+      
+      // Sync Old ones if any
+      for (const oldId of oldInvoiceIds) {
+        await syncInvoiceTotals(oldId);
+      }
+
+      toast.success('Trip berhasil ditambahkan ke Invoice!');
+      setSelectedTrips([]);
+      setInvoiceSelectModalOpen(false);
+      setSelectedInvoiceId('');
+    } catch {
+      toast.error('Gagal memproses penambahan invoice');
+    }
+  };
+
   const handleSaveSingle = async () => {
     if (!grupId || !platNomor || !proyekLokasiId || !kuariId || !jasaId || !volume || !hargaTrip || !tglMuat || !tglBongkar) {
       toast.error('Harap isi semua field yang wajib');
@@ -341,6 +382,32 @@ export default function Trips() {
     toast.success('Trip dihapus');
   };
 
+  // Smart Sync
+  const handleExportTrips = async () => {
+    try {
+      toast.info('Menyiapkan file ekspor...');
+      await exportSmartTrips();
+      toast.success('File ekspor berhasil diunduh');
+    } catch {
+      toast.error('Gagal mengekspor data');
+    }
+  };
+
+  const handleImportTrips = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      toast.info('Sedang mengimpor data...', { duration: 3000 });
+      const { imported, skipped } = await importSmartTrips(file);
+      toast.success(`Selesai! ${imported} Trip ditambahkan. ${skipped} Trip dilewati (duplikat).`);
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mengimpor file');
+    } finally {
+      e.target.value = ''; // Reset input
+    }
+  };
+
   // Export / Print
   const handleOpenFilter = (type: 'print' | 'excel') => {
     setActionType(type);
@@ -450,9 +517,15 @@ export default function Trips() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Riwayat Trip</CardTitle>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center flex-wrap">
                 <Button variant="outline" size="sm" onClick={() => handleOpenFilter('excel')}><Download className="w-4 h-4 mr-2" /> Excel</Button>
                 <Button variant="outline" size="sm" onClick={() => handleOpenFilter('print')}><Printer className="w-4 h-4 mr-2" /> Print PDF</Button>
+                <div className="w-px h-6 bg-border mx-1 hidden sm:block"></div>
+                <Button variant="secondary" size="sm" onClick={handleExportTrips}><DownloadCloud className="w-4 h-4 mr-2" /> Smart Export</Button>
+                <input type="file" id="import-trips" className="hidden" accept=".json" onChange={handleImportTrips} />
+                <Label htmlFor="import-trips" className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3">
+                  <UploadCloud className="w-4 h-4 mr-2" /> Smart Import
+                </Label>
               </div>
             </CardHeader>
             <CardContent>
@@ -495,10 +568,30 @@ export default function Trips() {
                   />
                 </div>
               </div>
+
+              {selectedTrips.length > 0 && (
+                <div className="flex items-center gap-4 bg-primary/10 p-3 rounded-lg border border-primary/20 mb-4 animate-in slide-in-from-top-2">
+                  <span className="font-semibold text-primary">{selectedTrips.length} Trip Dipilih</span>
+                  <Button size="sm" onClick={() => setInvoiceSelectModalOpen(true)}>Tambahkan ke Invoice</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setSelectedTrips([])}>Batal</Button>
+                </div>
+              )}
+
               <div className="overflow-x-auto border rounded-lg">
                 <table className="w-full text-sm text-left">
                   <thead className="bg-muted border-b">
                     <tr>
+                      <th className="p-3 w-12 text-center">
+                        <input 
+                          type="checkbox" 
+                          className="w-4 h-4 cursor-pointer accent-primary"
+                          checked={displayedTrips?.length > 0 && selectedTrips.length === displayedTrips.length} 
+                          onChange={(e) => {
+                             if (e.target.checked) setSelectedTrips(displayedTrips!.map(t => t.id!));
+                             else setSelectedTrips([]);
+                          }} 
+                        />
+                      </th>
                       <th className="p-3">Tanggal</th>
                       <th className="p-3">Grup & Plat</th>
                       <th className="p-3">Kuari</th>
@@ -509,7 +602,18 @@ export default function Trips() {
                   </thead>
                   <tbody>
                     {displayedTrips?.slice(0, 100).map(t => (
-                      <tr key={t.id} className="border-b">
+                      <tr key={t.id} className={`border-b ${selectedTrips.includes(t.id!) ? 'bg-primary/5' : ''}`}>
+                        <td className="p-3 text-center">
+                          <input 
+                            type="checkbox" 
+                            className="w-4 h-4 cursor-pointer accent-primary"
+                            checked={selectedTrips.includes(t.id!)}
+                            onChange={(e) => {
+                              if (e.target.checked) setSelectedTrips([...selectedTrips, t.id!]);
+                              else setSelectedTrips(selectedTrips.filter(id => id !== t.id!));
+                            }}
+                          />
+                        </td>
                         <td className="p-3">{format(new Date(t.tanggal_bongkar), 'dd/MM/yyyy')}</td>
                         <td className="p-3 font-medium">
                           {grupMobils?.find(g => g.id === t.grup_mobil_id)?.nama_grup} <br />
@@ -788,6 +892,34 @@ export default function Trips() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPrintModalOpen(false)}>Batal</Button>
             <Button onClick={executeAction}>Lanjutkan {actionType === 'print' ? 'Cetak' : 'Unduh'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* INVOICE SELECTION MODAL */}
+      <Dialog open={invoiceSelectModalOpen} onOpenChange={setInvoiceSelectModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tambahkan ke Invoice</DialogTitle>
+            <DialogDescription>Pilih invoice untuk {selectedTrips.length} trip yang dipilih.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Pilih Invoice</Label>
+              <Select value={selectedInvoiceId} onValueChange={setSelectedInvoiceId}>
+                <SelectTrigger><SelectValue placeholder="Pilih Invoice..." /></SelectTrigger>
+                <SelectContent>
+                  {invoices?.map(inv => (
+                    <SelectItem key={inv.id} value={inv.id!.toString()}>{inv.nomor_invoice} - {format(new Date(inv.tanggal_invoice), 'dd/MM/yyyy')}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">Data tagihan pada invoice akan dihitung ulang secara otomatis setelah penambahan.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInvoiceSelectModalOpen(false)}>Batal</Button>
+            <Button onClick={handleAddToInvoice}>Simpan ke Invoice</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

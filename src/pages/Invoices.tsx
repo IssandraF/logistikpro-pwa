@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import PrintInvoice from '@/components/PrintInvoice';
 import { printWithTitle } from '@/lib/print-utils';
 import { exportInvoiceExcel } from '@/lib/excel-utils';
+import { exportSmartInvoices, importSmartInvoices } from '@/lib/sync-utils';
 
 export default function Invoices() {
   const [activeTab, setActiveTab] = useState('data');
@@ -265,6 +266,32 @@ export default function Invoices() {
     }, 500);
   };
 
+  // Smart Sync
+  const handleExportInvoices = async () => {
+    try {
+      toast.info('Menyiapkan file ekspor...');
+      await exportSmartInvoices();
+      toast.success('File ekspor berhasil diunduh');
+    } catch {
+      toast.error('Gagal mengekspor data');
+    }
+  };
+
+  const handleImportInvoices = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      toast.info('Sedang mengimpor data invoice...', { duration: 3000 });
+      const { imported, skipped } = await importSmartInvoices(file);
+      toast.success(`Selesai! ${imported} Invoice ditambahkan. ${skipped} Invoice dilewati (duplikat).`);
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal mengimpor file');
+    } finally {
+      e.target.value = ''; // Reset input
+    }
+  };
+
   const selectedOwner = useLiveQuery(() => invoiceToPrint ? db.owners.get(invoiceToPrint.owner_id) : Promise.resolve(null), [invoiceToPrint]);
   const selectedProyek = useLiveQuery(() => invoiceToPrint ? db.proyeks.get(invoiceToPrint.proyek_id) : Promise.resolve(null), [invoiceToPrint]);
 
@@ -282,7 +309,16 @@ export default function Invoices() {
 
         <TabsContent value="data">
           <Card>
-            <CardHeader><CardTitle>Daftar Invoice</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Daftar Invoice</CardTitle>
+              <div className="flex gap-2 items-center flex-wrap">
+                <Button variant="secondary" size="sm" onClick={handleExportInvoices}><FileDown className="w-4 h-4 mr-2" /> Smart Export</Button>
+                <input type="file" id="import-invoices" className="hidden" accept=".json" onChange={handleImportInvoices} />
+                <Label htmlFor="import-invoices" className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3">
+                  <FileDown className="w-4 h-4 mr-2 rotate-180" /> Smart Import
+                </Label>
+              </div>
+            </CardHeader>
             <CardContent>
               <div className="overflow-x-auto border rounded-lg">
                 <table className="w-full text-sm text-left">

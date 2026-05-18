@@ -31,6 +31,8 @@ export default function Slips() {
   const [nomorSlip, setNomorSlip] = useState('');
   const [tglSlip, setTglSlip] = useState('');
   const [grupId, setGrupId] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
   
   // Print State
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,7 +58,22 @@ export default function Slips() {
   const { filteredTrips, groupedTrips, totalOngkosAwal, totalPotonganMaterial } = useMemo(() => {
     if (!grupId || !pendingTrips) return { filteredTrips: [], groupedTrips: {}, totalOngkosAwal: 0, totalPotonganMaterial: 0 };
     
-    const filtered = pendingTrips.filter(t => t.grup_mobil_id === Number(grupId));
+    const filtered = pendingTrips.filter(t => {
+      if (t.grup_mobil_id !== Number(grupId)) return false;
+      const tripDate = new Date(t.tanggal_bongkar);
+      tripDate.setHours(0, 0, 0, 0); // reset time for comparison
+      if (filterStartDate) {
+        const start = new Date(filterStartDate);
+        start.setHours(0, 0, 0, 0);
+        if (tripDate < start) return false;
+      }
+      if (filterEndDate) {
+        const end = new Date(filterEndDate);
+        end.setHours(23, 59, 59, 999);
+        if (tripDate > end) return false;
+      }
+      return true;
+    });
     
     const grouped = filtered.reduce((acc, t) => {
       const tglBongkar = t.tanggal_bongkar ? format(new Date(t.tanggal_bongkar), 'yyyy-MM-dd') : 'Belum Bongkar';
@@ -79,7 +96,7 @@ export default function Slips() {
     });
 
     return { filteredTrips: filtered, groupedTrips: grouped, totalOngkosAwal: totalAwal, totalPotonganMaterial: totalPotongan };
-  }, [grupId, pendingTrips, groupPrices, groupDeductions]);
+  }, [grupId, pendingTrips, groupPrices, groupDeductions, filterStartDate, filterEndDate]);
 
   const sisaKasbonTerkini = useMemo(() => {
     if (!grupId || !pinjamans) return 0;
@@ -434,8 +451,15 @@ export default function Slips() {
                   <Input value={nomorSlip} onChange={e => setNomorSlip(e.target.value)} placeholder="SLIP/2026/01" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Tanggal</Label>
+                  <Label>Tanggal Cetak Slip</Label>
                   <Input type="date" value={tglSlip} onChange={e => setTglSlip(e.target.value)} />
+                </div>
+                <div className="space-y-2 border p-2 rounded-md bg-muted/20">
+                  <Label className="block mb-2">Filter Periode Trip (Opsional)</Label>
+                  <div className="flex gap-2">
+                    <Input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} title="Dari Tanggal Bongkar" />
+                    <Input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} title="Sampai Tanggal Bongkar" />
+                  </div>
                 </div>
               </div>
 

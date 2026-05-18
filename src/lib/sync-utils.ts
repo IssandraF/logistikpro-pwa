@@ -1,0 +1,252 @@
+import { db } from './db';
+
+// --- UTILITIES ---
+
+const safeTrimLower = (val: string | undefined | null) => {
+  if (!val) return '';
+  return String(val).trim().toLowerCase();
+};
+
+export const findOrCreateByName = async (table: any, nameField: string, nameValue: string, extraFields = {}) => {
+  if (!nameValue || nameValue.trim() === '') return null;
+  const searchVal = safeTrimLower(nameValue);
+  
+  const allRecords = await table.toArray();
+  const existing = allRecords.find((r: any) => safeTrimLower(r[nameField]) === searchVal);
+  
+  if (existing) return existing.id;
+  
+  const newId = await table.add({
+    [nameField]: nameValue.trim(),
+    createdAt: new Date(),
+    isDeleted: 0,
+    ...extraFields
+  });
+  return newId;
+};
+
+export const findOrCreateProyekLokasi = async (proyekName: string, lokasiName: string) => {
+  if (!proyekName || !lokasiName) return null;
+  const pId = await findOrCreateByName(db.proyeks, 'nama_proyek', proyekName);
+  const lId = await findOrCreateByName(db.lokasiProyeks, 'nama_lokasi', lokasiName);
+  
+  const allPL = await db.proyekLokasis.toArray();
+  const existing = allPL.find(pl => pl.proyek_id === pId && pl.lokasi_proyek_id === lId);
+  
+  if (existing) return existing.id;
+  
+  const newId = await db.proyekLokasis.add({
+    proyek_id: pId!,
+    lokasi_proyek_id: lId!,
+    createdAt: new Date(),
+    isDeleted: 0
+  });
+  return newId;
+};
+
+// --- TRIPS ---
+
+export const exportSmartTrips = async () => {
+  const trips = await db.trips.toArray();
+  
+  // Cache masters to speed up mapping
+  const grupMobils = await db.grupMobils.toArray();
+  const kuaris = await db.lokasiKuaris.toArray();
+  const jasa = await db.jenisJasas.toArray();
+  const proyekLokasis = await db.proyekLokasis.toArray();
+  const proyeks = await db.proyeks.toArray();
+  const lokasiProyeks = await db.lokasiProyeks.toArray();
+  
+  const invoices = await db.invoices.toArray();
+  const slips = await db.slipPembayarans.toArray();
+
+  const exportedData = trips.map(t => {
+    const grup = grupMobils.find(g => g.id === t.grup_mobil_id);
+    const kuari = kuaris.find(k => k.id === t.lokasi_kuari_id);
+    const js = jasa.find(j => j.id === t.jenis_jasa_id);
+    
+    const pl = proyekLokasis.find(p => p.id === t.proyek_lokasi_id);
+    const proyek = pl ? proyeks.find(p => p.id === pl.proyek_id) : null;
+    const lokasi = pl ? lokasiProyeks.find(l => l.id === pl.lokasi_proyek_id) : null;
+    
+    const inv = invoices.find(i => i.id === t.invoice_id);
+    const slip = slips.find(s => s.id === t.slip_pembayaran_id);
+
+    return {
+      plat_nomor: t.plat_nomor,
+      volume: t.volume,
+      harga_trip: t.harga_trip,
+      total_harga: t.total_harga,
+      tanggal_muat: t.tanggal_muat,
+      tanggal_bongkar: t.tanggal_bongkar,
+      bukti_do: t.bukti_do, // optional
+      harga_bayar: t.harga_bayar,
+      potongan_trip: t.potongan_trip,
+      
+      // Relational Names
+      rel_grup_mobil: grup?.nama_grup || '',
+      rel_lokasi_kuari: kuari?.nama_lokasi || '',
+      rel_jenis_jasa: js?.nama_js || '',
+      rel_proyek: proyek?.nama_proyek || '',
+      rel_lokasi_bongkar: lokasi?.nama_lokasi || '',
+      
+      // Link to Invoices/Slips (must exist or will be ignored)
+      rel_invoice_nomor: inv?.nomor_invoice || '',
+      rel_slip_nomor: slip?.nomor_slip || ''
+    };
+  });
+
+  downloadJSON(exportedData, 'LogistikPro_Trips_SmartExport');
+};
+
+export const importSmartTrips = async (file: File) => {
+  const text = await file.text();
+  const data = JSON.parse(text);
+  if (!Array.isArray(data)) throw new Error("Invalid format. Expected an array.");
+
+  let imported = 0;
+  let skipped = 0;
+
+  await db.transaction('rw', db.tables, async () => {
+    const allInvoices = await db.invoices.toArray();
+    const allSlips = await db.slipPembayarans.toArray();
+    const allTrips = await db.trips.toArray();
+
+    for (const row of data) {
+      // Find natural keys
+      const grupId = await findOrCreateByName(db.grupMobils, 'nama_grup', row.rel_grup_mobil);
+      const kuariId = await findOrCreateByName(db.lokasiKuaris, 'nama_lokasi', row.rel_lokasi_kuari);
+      const jasaId = await findOrCreateByName(db.jenisJasas, 'nama_js', row.rel_jenis_jasa);
+      const plId = await findOrCreateProyekLokasi(row.rel_proyek, row.rel_lokasi_bongkar);
+
+      const invId = row.rel_invoice_nomor ? allInvoices.find(i => safeTrimLower(i.nomor_invoice) === safeTrimLower(row.rel_invoice_nomor))?.id : null;
+      const slipId = row.rel_slip_nomor ? allSlips.find(s => safeTrimLower(s.nomor_slip) === safeTrimLower(row.rel_slip_nomor))?.id : null;
+
+      // Check for duplication: same plat, same tanggal_bongkar, same volume
+      const isDuplicate = allTrips.some(t => 
+        safeTrimLower(t.plat_nomor) === safeTrimLower(row.plat_nomor) &&
+        new Date(t.tanggal_bongkar).getTime() === new Date(row.tanggal_bongkar).getTime() &&
+        t.volume === row.volume
+      );
+
+      if (isDuplicate) {
+        skipped++;
+        continue;
+      }
+
+      await db.trips.add({
+        plat_nomor: row.plat_nomor,
+        volume: row.volume,
+        harga_trip: row.harga_trip,
+        total_harga: row.total_harga,
+        tanggal_muat: new Date(row.tanggal_muat),
+        tanggal_bongkar: new Date(row.tanggal_bongkar),
+        bukti_do: row.bukti_do,
+        harga_bayar: row.harga_bayar,
+        potongan_trip: row.potongan_trip,
+        
+        grup_mobil_id: grupId || 0,
+        lokasi_kuari_id: kuariId || 0,
+        jenis_jasa_id: jasaId || 0,
+        proyek_lokasi_id: plId || 0,
+        invoice_id: invId || null,
+        slip_pembayaran_id: slipId || null,
+        
+        createdAt: new Date(),
+        isDeleted: 0
+      });
+      imported++;
+    }
+  });
+
+  return { imported, skipped };
+};
+
+// --- INVOICES ---
+
+export const exportSmartInvoices = async () => {
+  const invoices = await db.invoices.toArray();
+  const proyeks = await db.proyeks.toArray();
+  const owners = await db.owners.toArray();
+
+  const exportedData = invoices.map(inv => {
+    const proyek = proyeks.find(p => p.id === inv.proyek_id);
+    const owner = owners.find(o => o.id === inv.owner_id);
+
+    return {
+      nomor_invoice: inv.nomor_invoice,
+      tanggal_invoice: inv.tanggal_invoice,
+      total_kubikasi: inv.total_kubikasi,
+      total_harga_kotor: inv.total_harga_kotor,
+      is_potong_material: inv.is_potong_material,
+      total_potongan_material: inv.total_potongan_material,
+      total_harga_bersih: inv.total_harga_bersih,
+      kepada_custom: inv.kepada_custom,
+      nama_ttd: inv.nama_ttd,
+      status: inv.status,
+      
+      rel_proyek_nama: proyek?.nama_proyek || '',
+      rel_owner_nama: owner?.nama || ''
+    };
+  });
+
+  downloadJSON(exportedData, 'LogistikPro_Invoices_SmartExport');
+};
+
+export const importSmartInvoices = async (file: File) => {
+  const text = await file.text();
+  const data = JSON.parse(text);
+  if (!Array.isArray(data)) throw new Error("Invalid format. Expected an array.");
+
+  let imported = 0;
+  let skipped = 0;
+
+  await db.transaction('rw', db.tables, async () => {
+    const allInvoices = await db.invoices.toArray();
+
+    for (const row of data) {
+      // Check duplicate by nomor_invoice
+      const existing = allInvoices.find(i => safeTrimLower(i.nomor_invoice) === safeTrimLower(row.nomor_invoice));
+      if (existing) {
+        skipped++;
+        continue;
+      }
+
+      const proyekId = await findOrCreateByName(db.proyeks, 'nama_proyek', row.rel_proyek_nama);
+      const ownerId = await findOrCreateByName(db.owners, 'nama', row.rel_owner_nama);
+
+      await db.invoices.add({
+        nomor_invoice: row.nomor_invoice,
+        tanggal_invoice: new Date(row.tanggal_invoice),
+        proyek_id: proyekId || 0,
+        owner_id: ownerId || 0,
+        total_kubikasi: row.total_kubikasi,
+        total_harga_kotor: row.total_harga_kotor,
+        is_potong_material: row.is_potong_material,
+        total_potongan_material: row.total_potongan_material,
+        total_harga_bersih: row.total_harga_bersih,
+        kepada_custom: row.kepada_custom,
+        nama_ttd: row.nama_ttd,
+        status: row.status || 'draft',
+        createdAt: new Date()
+      });
+      imported++;
+    }
+  });
+
+  return { imported, skipped };
+};
+
+// --- HELPERS ---
+
+const downloadJSON = (data: any, prefix: string) => {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${prefix}_${new Date().toISOString().split('T')[0]}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
