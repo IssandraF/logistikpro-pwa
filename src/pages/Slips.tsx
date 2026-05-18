@@ -132,13 +132,18 @@ export default function Slips() {
 
       // 2. Update Trips
       const tripIds = filteredTrips.map(t => t.id!);
-      await db.trips.where('id').anyOf(tripIds).modify(t => {
+      for (const t of filteredTrips) {
         const tglBongkar = t.tanggal_bongkar ? format(new Date(t.tanggal_bongkar), 'yyyy-MM-dd') : 'Belum Bongkar';
         const key = `${tglBongkar}|${t.proyek_lokasi_id}|${t.lokasi_kuari_id}`;
-        t.slip_pembayaran_id = Number(slipId);
-        t.harga_bayar = groupPrices[key] !== undefined ? groupPrices[key] : t.harga_trip;
-        t.potongan_trip = groupDeductions[key] || 0;
-      });
+        const hargaBayar = groupPrices[key] !== undefined ? groupPrices[key] : t.harga_trip;
+        const potonganTrip = groupDeductions[key] || 0;
+        
+        await db.trips.update(t.id!, {
+          slip_pembayaran_id: Number(slipId),
+          harga_bayar: hargaBayar,
+          potongan_trip: potonganTrip
+        });
+      }
 
       // 3. Handle Kasbon Mutasi
       if (Number(potongKasbon) > 0) {

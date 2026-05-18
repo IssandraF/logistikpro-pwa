@@ -136,6 +136,31 @@ export default function Settings() {
     }
   };
 
+  const handleImportMerge = async () => {
+    if (!file) return toast.error('Pilih file backup (JSON) terlebih dahulu');
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (!confirm('Peringatan: Data akan digabungkan. Data dengan ID yang sama akan ditimpa (update), dan data baru akan ditambahkan. Lanjutkan?')) return;
+
+      await db.transaction('rw', db.tables, async () => {
+        for (const table of db.tables) {
+          if (data[table.name]) {
+            // bulkPut inserts new items and updates existing ones with same primary key
+            await table.bulkPut(data[table.name]);
+          }
+        }
+      });
+      
+      toast.success('Merge data berhasil! Muat ulang halaman.');
+      setTimeout(() => window.location.reload(), 1500);
+    } catch {
+      toast.error('Gagal melakukan merge. Pastikan format file benar.');
+    }
+  };
+
   const handleClearData = async () => {
     if (prompt('Ketik "HAPUS" untuk menghapus seluruh data secara permanen. PERINGATAN: Tindakan ini tidak bisa dibatalkan!') === 'HAPUS') {
       await Promise.all(db.tables.map(table => table.clear()));
@@ -248,7 +273,10 @@ export default function Settings() {
           <CardContent className="space-y-4">
             <Input type="file" accept=".json" onChange={e => setFile(e.target.files?.[0] || null)} />
             <Button onClick={handleImportJSON} variant="secondary" className="w-full border">
-              <UploadCloud className="w-4 h-4 mr-2" /> Restore dari JSON
+              <UploadCloud className="w-4 h-4 mr-2" /> Restore & Timpa Semua (Replace)
+            </Button>
+            <Button onClick={handleImportMerge} variant="outline" className="w-full border-primary text-primary">
+              <UploadCloud className="w-4 h-4 mr-2" /> Import & Gabungkan (Merge)
             </Button>
           </CardContent>
         </Card>
