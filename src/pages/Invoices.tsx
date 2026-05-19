@@ -313,7 +313,7 @@ export default function Invoices() {
               <CardTitle>Daftar Invoice</CardTitle>
               <div className="flex gap-2 items-center flex-wrap">
                 <Button variant="secondary" size="sm" onClick={handleExportInvoices}><FileDown className="w-4 h-4 mr-2" /> Smart Export</Button>
-                <input type="file" id="import-invoices" className="hidden" accept=".json" onChange={handleImportInvoices} />
+                <input type="file" id="import-invoices" className="hidden" accept=".json" onChange={handleImportInvoices} title="Import Invoices Data" />
                 <Label htmlFor="import-invoices" className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3">
                   <FileDown className="w-4 h-4 mr-2 rotate-180" /> Smart Import
                 </Label>

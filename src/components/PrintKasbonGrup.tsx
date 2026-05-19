@@ -1,6 +1,5 @@
 import { format } from "date-fns";
 import type { PinjamanGrup, GrupMobil, KasbonMutasi, SlipPembayaran, Trip, ProyekLokasi, LokasiProyek, LokasiKuari } from "@/lib/db";
-import PrintSlip from "./PrintSlip";
 
 interface PrintKasbonGrupProps {
   grupMobil: GrupMobil;
@@ -17,86 +16,174 @@ export default function PrintKasbonGrup({
   grupMobil, pinjaman, mutasis, slips, allTrips, proyekLokasis, lokasiProyeks, lokasiKuaris
 }: PrintKasbonGrupProps) {
 
-  // Hanya mutasi penambahan yang ditampilkan di tabel Riwayat Pengambilan Kasbon
-  const mutasiPengambilan = mutasis.filter(m => m.jenis === 'penambahan').sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
+  // Urutkan mutasi berdasarkan tanggal (ascending) untuk menghitung saldo berjalan
+  const sortedMutasi = [...mutasis].sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
   
   // Slips yang memiliki potongan_kasbon > 0
   const slipsWithKasbon = slips.filter(s => s.potongan_kasbon > 0).sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
 
+  let currentSaldo = 0;
+  const mutasiWithSaldo = sortedMutasi.map(m => {
+    if (m.jenis === 'penambahan') {
+      currentSaldo += m.nominal;
+    } else {
+      currentSaldo -= m.nominal;
+    }
+    return { ...m, calculatedSaldo: currentSaldo };
+  });
+
   return (
     <div className="hidden print:block printable-invoice">
-      <div className="text-center font-bold underline mb-5 text-[18px]">REKAPITULASI KASBON VENDOR</div>
+      <div className="text-center mb-6">
+        <h2 className="text-[20px] font-bold m-0 p-0">RINGKASAN BUKU BESAR KAS BON VENDOR</h2>
+        <p className="m-0 p-0 text-gray-600"><strong>{grupMobil.nama_grup.toUpperCase()}</strong> | Tgl Cetak: {format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
+      </div>
 
-      <table className="info-table w-full mb-5 border-none">
-        <tbody>
-          <tr>
-            <td className="w-[20%] border-none p-1">Nama Grup / Vendor</td>
-            <td className="w-[40%] border-none p-1">: <span className="font-bold">{grupMobil.nama_grup.toUpperCase()}</span></td>
-            <td className="w-[20%] border-none p-1">Total Pinjaman</td>
-            <td className="w-[20%] border-none p-1">: Rp {pinjaman.total_pinjaman.toLocaleString('id-ID')}</td>
-          </tr>
-          <tr>
-            <td className="border-none p-1">PIC / Telp</td>
-            <td className="border-none p-1">: {(grupMobil.nama_pic || '-').toUpperCase()} / {grupMobil.no_hp || '-'}</td>
-            <td className="border-none p-1">Total Terbayar (Dipotong)</td>
-            <td className="border-none p-1">: Rp {pinjaman.total_potongan.toLocaleString('id-ID')}</td>
-          </tr>
-          <tr>
-            <td className="border-none p-1">Tanggal Cetak</td>
-            <td className="border-none p-1">: {format(new Date(), 'dd/MM/yyyy HH:mm')}</td>
-            <td className="border-none p-1 font-bold text-red-600">SISA KASBON SAAT INI</td>
-            <td className="border-none p-1 font-bold text-red-600">: Rp {pinjaman.sisa_kasbon.toLocaleString('id-ID')}</td>
-          </tr>
-        </tbody>
-      </table>
+      <p className="text-[14px] mb-2">
+        <strong>Sisa Pinjaman Terakhir:</strong> <span className="text-red-600 font-bold">Rp {pinjaman.sisa_kasbon.toLocaleString('id-ID')}</span>
+      </p>
 
-      <p className="mb-2 font-bold text-[14px]">RIWAYAT PENGAMBILAN KASBON:</p>
-      <table className="main-table w-full mb-8">
+      <table className="w-full border-collapse mb-8 text-[12px]">
         <thead>
-          <tr>
-            <th className="w-[5%]">NO</th>
-            <th className="w-[15%]">TANGGAL</th>
-            <th className="w-[50%] text-left pl-2">KETERANGAN</th>
-            <th className="w-[30%] text-right pr-2">NOMINAL (Rp)</th>
+          <tr className="bg-gray-100">
+            <th className="border border-gray-300 p-2 text-center w-[5%]">No</th>
+            <th className="border border-gray-300 p-2 text-center w-[12%]">Tanggal</th>
+            <th className="border border-gray-300 p-2 text-left">Keterangan</th>
+            <th className="border border-gray-300 p-2 text-right w-[18%]">Debit (Hutang +)</th>
+            <th className="border border-gray-300 p-2 text-right w-[18%]">Kredit (Pelunasan -)</th>
+            <th className="border border-gray-300 p-2 text-right w-[18%]">Saldo Berjalan</th>
           </tr>
         </thead>
         <tbody>
-          {mutasiPengambilan.map((m, idx) => (
-            <tr key={m.id}>
-              <td className="text-center">{idx + 1}</td>
-              <td className="text-center">{format(new Date(m.tanggal), 'dd/MM/yyyy')}</td>
-              <td className="text-left pl-2">{m.keterangan}</td>
-              <td className="text-right pr-2 text-red-600">{m.nominal.toLocaleString('id-ID')}</td>
-            </tr>
-          ))}
-          {mutasiPengambilan.length === 0 && (
-             <tr><td colSpan={4} className="text-center italic">Tidak ada riwayat pengambilan kasbon</td></tr>
+          {mutasiWithSaldo.map((m, idx) => {
+            let descTitle = 'Mutasi Kasbon';
+            if (m.jenis === 'penambahan') descTitle = 'Pinjaman Baru';
+            if (m.jenis === 'potongan') descTitle = 'Potongan dari Slip Gaji';
+
+            // Temukan nomor slip jika ini potongan dari slip
+            const linkedSlip = m.slip_pembayaran_id ? slips.find(s => s.id === m.slip_pembayaran_id) : null;
+
+            return (
+              <tr key={m.id}>
+                <td className="border border-gray-300 p-2 text-center">{idx + 1}</td>
+                <td className="border border-gray-300 p-2 text-center">{format(new Date(m.tanggal), 'dd/MM/yyyy')}</td>
+                <td className="border border-gray-300 p-2 text-left">
+                  <strong>{descTitle}</strong>
+                  <br/>
+                  <span className="text-gray-600">{m.keterangan || '-'}</span>
+                  {linkedSlip && (
+                    <><br/><span>Slip: {linkedSlip.nomor_slip}</span></>
+                  )}
+                </td>
+                <td className="border border-gray-300 p-2 text-right text-red-600">
+                  {m.jenis === 'penambahan' ? m.nominal.toLocaleString('id-ID') : '-'}
+                </td>
+                <td className="border border-gray-300 p-2 text-right text-green-600">
+                  {m.jenis === 'potongan' ? m.nominal.toLocaleString('id-ID') : '-'}
+                </td>
+                <td className="border border-gray-300 p-2 text-right font-bold">
+                  {m.calculatedSaldo.toLocaleString('id-ID')}
+                </td>
+              </tr>
+            );
+          })}
+          {sortedMutasi.length === 0 && (
+             <tr><td colSpan={6} className="border border-gray-300 p-2 text-center">Belum ada riwayat mutasi untuk grup ini.</td></tr>
           )}
         </tbody>
+        <tfoot>
+          <tr>
+             <td colSpan={5} className="border border-gray-300 p-2 text-right font-bold">Total Sisa Saldo Akhir:</td>
+             <td className="border border-gray-300 p-2 text-right font-bold">Rp {currentSaldo.toLocaleString('id-ID')}</td>
+          </tr>
+        </tfoot>
       </table>
 
       {slipsWithKasbon.length > 0 && (
         <div style={{ pageBreakBefore: 'always' }}>
-           <div className="text-center font-bold text-[16px] mb-6 underline">
-             LAMPIRAN SLIP PEMBAYARAN (YANG MEMOTONG KASBON)
+           <div className="text-center mb-6">
+              <h2 className="text-[20px] font-bold m-0 p-0">LAMPIRAN RINCIAN POTONGAN SLIP TAGIHAN</h2>
+              <p className="m-0 p-0 text-gray-600">Vendor: <strong>{grupMobil.nama_grup.toUpperCase()}</strong></p>
            </div>
            
-           {slipsWithKasbon.map((slip, index) => {
-             const tripsForSlip = allTrips.filter(t => t.slip_pembayaran_id === slip.id);
-             return (
-               <div key={slip.id} className={index > 0 ? "mt-10 pt-10 border-t-2 border-dashed border-gray-400" : ""}>
-                  <PrintSlip
-                    slip={slip}
-                    trips={tripsForSlip}
-                    grupMobil={grupMobil}
-                    proyekLokasis={proyekLokasis}
-                    lokasiProyeks={lokasiProyeks}
-                    lokasiKuaris={lokasiKuaris}
-                    isNested={true}
-                  />
-               </div>
-             )
-           })}
+           <div className="mt-6">
+             {slipsWithKasbon.map((slip) => {
+               const tripsForSlip = allTrips.filter(t => t.slip_pembayaran_id === slip.id).sort((a, b) => new Date(a.tanggal_bongkar).getTime() - new Date(b.tanggal_bongkar).getTime());
+               
+               const nilaiBersihHakVendor = slip.total_bersih_dibayar + slip.potongan_kasbon;
+               const totalCashKeluar = slip.total_bersih_dibayar;
+
+               return (
+                 <div key={slip.id} className="border border-black mb-5 p-4" style={{ pageBreakInside: 'avoid' }}>
+                    <div className="border-b-2 border-black pb-2 mb-4 font-bold text-[14px]">
+                       No Slip: {slip.nomor_slip} | Tanggal: {format(new Date(slip.tanggal), 'dd/MM/yyyy')}
+                    </div>
+                    
+                    <table className="w-full border-collapse text-[11px] mb-2">
+                       <thead>
+                          <tr className="bg-gray-100">
+                             <th className="border border-black p-1 text-center w-[12%]">Tgl Trip</th>
+                             <th className="border border-black p-1 text-center w-[15%]">Plat Nomor</th>
+                             <th className="border border-black p-1 text-left">Rute (Kuari - Proyek)</th>
+                             <th className="border border-black p-1 text-right w-[10%]">Volume</th>
+                             <th className="border border-black p-1 text-right w-[15%]">Harga/Vol</th>
+                             <th className="border border-black p-1 text-right w-[15%]">Total Harga</th>
+                          </tr>
+                       </thead>
+                       <tbody>
+                          {tripsForSlip.map(trip => {
+                             const kuari = lokasiKuaris.find(k => k.id === trip.lokasi_kuari_id)?.nama_lokasi || '-';
+                             const pl = proyekLokasis.find(p => p.id === trip.proyek_lokasi_id);
+                             const proyek = pl ? (lokasiProyeks.find(lp => lp.id === pl.lokasi_proyek_id)?.nama_lokasi || '-') : '-';
+                             const subtotal = trip.volume * (trip.harga_bayar || 0);
+
+                             return (
+                               <tr key={trip.id}>
+                                  <td className="border border-black p-1 text-center">{format(new Date(trip.tanggal_bongkar), 'dd/MM/yy')}</td>
+                                  <td className="border border-black p-1 text-center">{trip.plat_nomor}</td>
+                                  <td className="border border-black p-1 text-left">{kuari} - {proyek}</td>
+                                  <td className="border border-black p-1 text-right">{trip.volume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                  <td className="border border-black p-1 text-right">{trip.harga_bayar?.toLocaleString('id-ID') || 0}</td>
+                                  <td className="border border-black p-1 text-right">{subtotal.toLocaleString('id-ID')}</td>
+                               </tr>
+                             );
+                          })}
+                          {tripsForSlip.length === 0 && (
+                            <tr><td colSpan={6} className="border border-black p-1 text-center">Tidak ada detail trip.</td></tr>
+                          )}
+                       </tbody>
+                    </table>
+
+                    <div className="flex justify-end mt-2">
+                       <table className="w-[45%] text-[12px] border-none">
+                          <tbody>
+                             <tr>
+                                <td className="p-1 border-none">Nilai Kotor (Total Ongkos Trip)</td>
+                                <td className="p-1 border-none text-right">Rp {slip.total_trip_ongkos.toLocaleString('id-ID')}</td>
+                             </tr>
+                             <tr>
+                                <td className="p-1 border-none">Potongan Material</td>
+                                <td className="p-1 border-none text-right text-red-600">- Rp {slip.potongan_material.toLocaleString('id-ID')}</td>
+                             </tr>
+                             <tr className="border-t-2 border-black font-bold">
+                                <td className="p-1 border-none pt-2">Nilai Bersih Hak Vendor</td>
+                                <td className="p-1 border-none text-right pt-2">Rp {nilaiBersihHakVendor.toLocaleString('id-ID')}</td>
+                             </tr>
+                             <tr>
+                                <td className="p-1 border-none"><strong>Potongan Kasbon (Sesuai Mutasi)</strong></td>
+                                <td className="p-1 border-none text-right text-red-600"><strong>- Rp {slip.potongan_kasbon.toLocaleString('id-ID')}</strong></td>
+                             </tr>
+                             <tr className="border-t-2 border-black font-bold">
+                                <td className="p-1 border-none pt-2">Total Cash Keluar</td>
+                                <td className="p-1 border-none text-right pt-2">Rp {totalCashKeluar.toLocaleString('id-ID')}</td>
+                             </tr>
+                          </tbody>
+                       </table>
+                    </div>
+                 </div>
+               )
+             })}
+           </div>
         </div>
       )}
     </div>

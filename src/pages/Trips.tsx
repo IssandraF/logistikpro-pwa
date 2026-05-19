@@ -523,7 +523,7 @@ export default function Trips() {
                 <Button variant="outline" size="sm" onClick={() => handleOpenFilter('print')}><Printer className="w-4 h-4 mr-2" /> Print PDF</Button>
                 <div className="w-px h-6 bg-border mx-1 hidden sm:block"></div>
                 <Button variant="secondary" size="sm" onClick={() => handleExportTrips(false)}><DownloadCloud className="w-4 h-4 mr-2" /> Smart Export (Semua)</Button>
-                <input type="file" id="import-trips" className="hidden" accept=".json" onChange={handleImportTrips} />
+                <input type="file" id="import-trips" className="hidden" accept=".json" onChange={handleImportTrips} title="Import Trips Data" />
                 <Label htmlFor="import-trips" className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-3">
                   <UploadCloud className="w-4 h-4 mr-2" /> Smart Import
                 </Label>
