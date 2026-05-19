@@ -11,6 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { printWithTitle } from '@/lib/print-utils';
+import PrintKasbonGrup from '@/components/PrintKasbonGrup';
+import { Printer } from 'lucide-react';
 
 export default function Finance() {
   const [activeTab, setActiveTab] = useState('buku-kas');
@@ -137,6 +140,41 @@ export default function Finance() {
     setKeteranganPinjam('');
   };
 
+  // Print Kasbon State
+  const [printData, setPrintData] = useState<any>(null);
+
+  const handlePrintKasbon = async (pinjamanGrup: any) => {
+    toast.info('Menyiapkan dokumen cetak...');
+    const grup = grupMobils?.find(g => g.id === pinjamanGrup.grup_mobil_id);
+    if (!grup) return toast.error('Grup tidak ditemukan');
+
+    const allMutasis = await db.kasbonMutasis.where('grup_mobil_id').equals(grup.id!).toArray();
+    const allSlips = await db.slipPembayarans.where('grup_mobil_id').equals(grup.id!).toArray();
+    
+    // Trips for slips that have kasbon deduction
+    const slipIds = allSlips.filter(s => s.potongan_kasbon > 0).map(s => s.id!);
+    const allTrips = slipIds.length > 0 ? await db.trips.where('slip_pembayaran_id').anyOf(slipIds).toArray() : [];
+
+    const proyekLokasis = await db.proyekLokasis.toArray();
+    const lokasiProyeks = await db.lokasiProyeks.toArray();
+    const lokasiKuaris = await db.lokasiKuaris.toArray();
+
+    setPrintData({
+      grupMobil: grup,
+      pinjaman: pinjamanGrup,
+      mutasis: allMutasis,
+      slips: allSlips,
+      allTrips,
+      proyekLokasis,
+      lokasiProyeks,
+      lokasiKuaris
+    });
+
+    setTimeout(() => {
+      printWithTitle(`Rekap_Kasbon_${grup.nama_grup.replace(/ /g, '_')}`);
+    }, 500);
+  };
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">Keuangan & Kas</h1>
@@ -256,6 +294,7 @@ export default function Finance() {
                         <th className="p-3">Total Pinjaman</th>
                         <th className="p-3">Total Terbayar</th>
                         <th className="p-3 font-bold">Sisa Hutang</th>
+                        <th className="p-3 text-center">Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -265,6 +304,11 @@ export default function Finance() {
                           <td className="p-3">{p.total_pinjaman.toLocaleString('id-ID')}</td>
                           <td className="p-3">{p.total_potongan.toLocaleString('id-ID')}</td>
                           <td className="p-3 font-bold text-destructive">Rp {p.sisa_kasbon.toLocaleString('id-ID')}</td>
+                          <td className="p-3 text-center">
+                            <Button variant="outline" size="sm" onClick={() => handlePrintKasbon(p)}>
+                              <Printer className="w-4 h-4 mr-2 text-blue-600" /> Print Rekap
+                            </Button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -371,6 +415,20 @@ export default function Finance() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Hidden Print Layout */}
+      {printData && (
+        <PrintKasbonGrup
+          grupMobil={printData.grupMobil}
+          pinjaman={printData.pinjaman}
+          mutasis={printData.mutasis}
+          slips={printData.slips}
+          allTrips={printData.allTrips}
+          proyekLokasis={printData.proyekLokasis}
+          lokasiProyeks={printData.lokasiProyeks}
+          lokasiKuaris={printData.lokasiKuaris}
+        />
+      )}
     </div>
   );
 }

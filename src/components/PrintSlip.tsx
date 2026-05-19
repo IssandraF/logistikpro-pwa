@@ -10,6 +10,7 @@ interface PrintSlipProps {
   proyekLokasis: ProyekLokasi[];
   lokasiProyeks: LokasiProyek[];
   lokasiKuaris: LokasiKuari[];
+  isNested?: boolean;
 }
 
 export default function PrintSlip({
@@ -18,7 +19,8 @@ export default function PrintSlip({
   grupMobil,
   proyekLokasis,
   lokasiProyeks,
-  lokasiKuaris
+  lokasiKuaris,
+  isNested = false
 }: PrintSlipProps) {
   
   // Rute group calculation (for the main summary table)
@@ -65,7 +67,7 @@ export default function PrintSlip({
     : '-';
 
   return (
-    <div className="hidden print:block printable-invoice">
+    <div className={isNested ? "mb-10 w-full" : "hidden print:block printable-invoice"}>
       <div className="text-center font-bold underline mb-5 text-[18px]">SLIP PEMBAYARAN</div>
 
       <table className="info-table w-full mb-5 border-none">
