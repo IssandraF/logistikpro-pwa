@@ -22,15 +22,14 @@ export default function PrintKasbonGrup({
   // Slips yang memiliki potongan_kasbon > 0
   const slipsWithKasbon = slips.filter(s => s.potongan_kasbon > 0).sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
 
-  let currentSaldo = 0;
-  const mutasiWithSaldo = sortedMutasi.map(m => {
-    if (m.jenis === 'penambahan') {
-      currentSaldo += m.nominal;
-    } else {
-      currentSaldo -= m.nominal;
-    }
-    return { ...m, calculatedSaldo: currentSaldo };
-  });
+  const mutasiWithSaldo = sortedMutasi.reduce((acc, m) => {
+    const prevSaldo = acc.length > 0 ? acc[acc.length - 1].calculatedSaldo : 0;
+    const newSaldo = m.jenis === 'penambahan' ? prevSaldo + m.nominal : prevSaldo - m.nominal;
+    acc.push({ ...m, calculatedSaldo: newSaldo });
+    return acc;
+  }, [] as (KasbonMutasi & { calculatedSaldo: number })[]);
+
+  const currentSaldo = mutasiWithSaldo.length > 0 ? mutasiWithSaldo[mutasiWithSaldo.length - 1].calculatedSaldo : 0;
 
   return (
     <div className="hidden print:block printable-invoice">

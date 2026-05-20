@@ -141,8 +141,10 @@ export default function Finance() {
   };
 
   // Print Kasbon State
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [printData, setPrintData] = useState<any>(null);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handlePrintKasbon = async (pinjamanGrup: any) => {
     toast.info('Menyiapkan dokumen cetak...');
     const grup = grupMobils?.find(g => g.id === pinjamanGrup.grup_mobil_id);

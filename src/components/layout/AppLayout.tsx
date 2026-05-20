@@ -29,7 +29,7 @@ export default function AppLayout() {
         navigate('/app/onboarding');
       }
     }
-  }, [settings, location.pathname, navigate]);
+  }, [settings, settingsArray, location.pathname, navigate]);
 
   // If we're on the onboarding page, render just the Outlet (no sidebar)
   if (location.pathname === '/app/onboarding') {

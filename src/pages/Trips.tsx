@@ -402,6 +402,7 @@ export default function Trips() {
       toast.info('Sedang mengimpor data...', { duration: 3000 });
       const { imported, skipped } = await importSmartTrips(file);
       toast.success(`Selesai! ${imported} Trip ditambahkan. ${skipped} Trip dilewati (duplikat).`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       toast.error(err.message || 'Gagal mengimpor file');
     } finally {

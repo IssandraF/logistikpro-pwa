@@ -31,6 +31,7 @@ export default function MasterData() {
     cancelEditGrup();
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editGrup = (g: any) => {
     setEditingGrupId(g.id);
     setNamaGrup(g.nama_grup);
@@ -66,6 +67,7 @@ export default function MasterData() {
     cancelEditProyek();
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editProyek = (p: any) => {
     setEditingProyekId(p.id);
     setNamaProyek(p.nama_proyek);
@@ -93,6 +95,7 @@ export default function MasterData() {
     cancelEditKuari();
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editKuari = (k: any) => {
     setEditingKuariId(k.id);
     setNamaKuari(k.nama_lokasi);
@@ -120,6 +123,7 @@ export default function MasterData() {
     cancelEditJs();
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editJs = (j: any) => {
     setEditingJsId(j.id);
     setNamaJs(j.nama_js);
@@ -169,6 +173,7 @@ export default function MasterData() {
     cancelEditRute();
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editRute = (pl: any, lName: string) => {
     setEditingRuteId({ pivotId: pl.id, lokasiId: pl.lokasi_proyek_id });
     setSelectedProyekId(pl.proyek_id.toString());
@@ -221,6 +226,7 @@ export default function MasterData() {
     cancelEditOwner();
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const editOwner = (o: any) => {
     setEditingOwnerId(o.id);
     setNamaOwner(o.nama);

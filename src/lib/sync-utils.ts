@@ -7,11 +7,13 @@ const safeTrimLower = (val: string | undefined | null) => {
   return String(val).trim().toLowerCase();
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const findOrCreateByName = async (table: any, nameField: string, nameValue: string, extraFields = {}) => {
   if (!nameValue || nameValue.trim() === '') return null;
   const searchVal = safeTrimLower(nameValue);
   
   const allRecords = await table.toArray();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const existing = allRecords.find((r: any) => safeTrimLower(r[nameField]) === searchVal);
   
   if (existing) return existing.id;
@@ -47,7 +49,7 @@ export const findOrCreateProyekLokasi = async (proyekName: string, lokasiName: s
 // --- TRIPS ---
 
 export const exportSmartTrips = async (tripIds?: number[]) => {
-  let trips = [];
+  let trips;
   if (tripIds && tripIds.length > 0) {
     trips = await db.trips.where('id').anyOf(tripIds).toArray();
   } else {
@@ -269,6 +271,7 @@ export const importSmartInvoices = async (file: File) => {
 
 // --- HELPERS ---
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const downloadJSON = (data: any, prefix: string) => {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);

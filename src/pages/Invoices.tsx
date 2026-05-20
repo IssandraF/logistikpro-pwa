@@ -285,6 +285,7 @@ export default function Invoices() {
       toast.info('Sedang mengimpor data invoice...', { duration: 3000 });
       const { imported, skipped } = await importSmartInvoices(file);
       toast.success(`Selesai! ${imported} Invoice ditambahkan. ${skipped} Invoice dilewati (duplikat).`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       toast.error(err.message || 'Gagal mengimpor file');
     } finally {

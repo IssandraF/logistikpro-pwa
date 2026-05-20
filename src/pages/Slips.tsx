@@ -148,7 +148,6 @@ export default function Slips() {
       });
 
       // 2. Update Trips
-      const tripIds = filteredTrips.map(t => t.id!);
       for (const t of filteredTrips) {
         const tglBongkar = t.tanggal_bongkar ? format(new Date(t.tanggal_bongkar), 'yyyy-MM-dd') : 'Belum Bongkar';
         const key = `${tglBongkar}|${t.proyek_lokasi_id}|${t.lokasi_kuari_id}`;
