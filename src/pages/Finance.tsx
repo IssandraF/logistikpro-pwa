@@ -60,6 +60,39 @@ export default function Finance() {
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleDeleteKasbon = async (mutasi: any) => {
+    if (mutasi.slip_pembayaran_id !== 0) {
+      toast.error('Mutasi ini otomatis dari slip, tidak bisa dihapus langsung.');
+      return;
+    }
+    if (confirm('Yakin ingin menghapus mutasi kasbon ini? Saldo hutang vendor akan disesuaikan.')) {
+      // Revert pinjaman grup
+      const p = await db.pinjamanGrups.where('grup_mobil_id').equals(mutasi.grup_mobil_id).first();
+      if (p) {
+        await db.pinjamanGrups.update(p.id!, {
+          total_pinjaman: p.total_pinjaman - mutasi.nominal,
+          sisa_kasbon: p.sisa_kasbon - mutasi.nominal
+        });
+      }
+      
+      // Try to find and delete the related kas entry
+      const grupName = grupMobils?.find(g => g.id === mutasi.grup_mobil_id)?.nama_grup;
+      const expectedKet = `Kasbon: ${mutasi.keterangan} (Grup: ${grupName})`;
+      const kasEntry = await db.kas
+        .filter(k => k.jenis === 'keluar' && k.nominal === mutasi.nominal && k.keterangan === expectedKet)
+        .first();
+      
+      if (kasEntry) {
+        await db.kas.delete(kasEntry.id!);
+      }
+
+      // Delete mutasi
+      await db.kasbonMutasis.delete(mutasi.id);
+      toast.success('Mutasi kasbon berhasil dihapus');
+    }
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const openEditModal = (k: any) => {
     if (k.slip_pembayaran_id || k.invoice_id) {
       toast.error('Tidak bisa diedit: Transaksi ini dibuat otomatis oleh sistem (Invoice/Slip)');
@@ -328,6 +361,7 @@ export default function Finance() {
                         <th className="p-3">Grup</th>
                         <th className="p-3">Keterangan</th>
                         <th className="p-3">Nominal</th>
+                        <th className="p-3 text-center">Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -341,6 +375,15 @@ export default function Finance() {
                           </td>
                           <td className={m.jenis === 'penambahan' ? 'p-3 text-destructive font-medium' : 'p-3 text-green-600 font-medium'}>
                             {m.nominal.toLocaleString('id-ID')}
+                          </td>
+                          <td className="p-3 text-center">
+                            {m.slip_pembayaran_id === 0 && m.jenis === 'penambahan' ? (
+                              <Button variant="outline" size="sm" onClick={() => handleDeleteKasbon(m)}>
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground italic">Otomatis</span>
+                            )}
                           </td>
                         </tr>
                       ))}
