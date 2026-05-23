@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
-import { ArrowUpRight, ArrowDownRight, Wallet, Trash2, Edit } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Wallet, Trash2, Edit, Printer, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +13,6 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { printWithTitle } from '@/lib/print-utils';
 import PrintKasbonGrup from '@/components/PrintKasbonGrup';
-import { Printer } from 'lucide-react';
 
 export default function Finance() {
   const [activeTab, setActiveTab] = useState('buku-kas');
@@ -177,9 +176,11 @@ export default function Finance() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [printData, setPrintData] = useState<any>(null);
 
+  const [previewKasbonOpen, setPreviewKasbonOpen] = useState(false);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handlePrintKasbon = async (pinjamanGrup: any) => {
-    toast.info('Menyiapkan dokumen cetak...');
+  const handleActionKasbon = async (pinjamanGrup: any, mode: 'print' | 'view') => {
+    if (mode === 'print') toast.info('Menyiapkan dokumen cetak...');
     const grup = grupMobils?.find(g => g.id === pinjamanGrup.grup_mobil_id);
     if (!grup) return toast.error('Grup tidak ditemukan');
 
@@ -205,9 +206,13 @@ export default function Finance() {
       lokasiKuaris
     });
 
-    setTimeout(() => {
-      printWithTitle(`Rekap_Kasbon_${grup.nama_grup.replace(/ /g, '_')}`);
-    }, 500);
+    if (mode === 'print') {
+      setTimeout(() => {
+        printWithTitle(`Rekap_Kasbon_${grup.nama_grup.replace(/ /g, '_')}`);
+      }, 500);
+    } else {
+      setPreviewKasbonOpen(true);
+    }
   };
 
   return (
@@ -339,9 +344,12 @@ export default function Finance() {
                           <td className="p-3">{p.total_pinjaman.toLocaleString('id-ID')}</td>
                           <td className="p-3">{p.total_potongan.toLocaleString('id-ID')}</td>
                           <td className="p-3 font-bold text-destructive">Rp {p.sisa_kasbon.toLocaleString('id-ID')}</td>
-                          <td className="p-3 text-center">
-                            <Button variant="outline" size="sm" onClick={() => handlePrintKasbon(p)}>
-                              <Printer className="w-4 h-4 mr-2 text-blue-600" /> Print Rekap
+                          <td className="p-3 text-center flex gap-2 justify-center">
+                            <Button variant="outline" size="sm" onClick={() => handleActionKasbon(p, 'view')}>
+                              <Eye className="w-4 h-4 mr-2 text-green-600" /> View
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => handleActionKasbon(p, 'print')}>
+                              <Printer className="w-4 h-4 mr-2 text-blue-600" /> Print
                             </Button>
                           </td>
                         </tr>
@@ -457,6 +465,39 @@ export default function Finance() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditModalOpen(false)}>Batal</Button>
             <Button onClick={handleUpdateKas}>Simpan Perubahan</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Kasbon Modal */}
+      <Dialog open={previewKasbonOpen} onOpenChange={setPreviewKasbonOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="print:hidden">
+            <DialogTitle>Preview Rekap Kasbon</DialogTitle>
+          </DialogHeader>
+          <div className="bg-gray-100 p-4 rounded-md">
+            {printData && (
+              <PrintKasbonGrup
+                grupMobil={printData.grupMobil}
+                pinjaman={printData.pinjaman}
+                mutasis={printData.mutasis}
+                slips={printData.slips}
+                allTrips={printData.allTrips}
+                proyekLokasis={printData.proyekLokasis}
+                lokasiProyeks={printData.lokasiProyeks}
+                lokasiKuaris={printData.lokasiKuaris}
+                previewMode={true}
+              />
+            )}
+          </div>
+          <DialogFooter className="print:hidden">
+            <Button variant="outline" onClick={() => setPreviewKasbonOpen(false)}>Tutup</Button>
+            <Button onClick={() => {
+              setPreviewKasbonOpen(false);
+              setTimeout(() => {
+                printWithTitle(`Rekap_Kasbon_${printData?.grupMobil?.nama_grup.replace(/ /g, '_')}`);
+              }, 500);
+            }}><Printer className="w-4 h-4 mr-2" /> Cetak Sekarang</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

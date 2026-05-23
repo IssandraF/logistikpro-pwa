@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { format } from 'date-fns';
 
 import { toast } from 'sonner';
-import { Download, Printer, Plus, Trash2, CheckSquare, Edit, UploadCloud, DownloadCloud } from 'lucide-react';
+import { Trash2, FileText, Download, Printer, Plus, DownloadCloud, UploadCloud, Edit, Eye } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import PrintRekapTrips from '@/components/PrintRekapTrips';
 import { printWithTitle } from '@/lib/print-utils';
@@ -48,7 +48,6 @@ export default function Trips() {
   const [massTglBongkar, setMassTglBongkar] = useState('');
   const [massJasaId, setMassJasaId] = useState('');
   const [massProyekLokasiId, setMassProyekLokasiId] = useState('');
-  const [massKuariId, setMassKuariId] = useState('');
   const [massHargaTrip, setMassHargaTrip] = useState('');
   
   interface MassRow {
@@ -56,8 +55,9 @@ export default function Trips() {
     plat_nomor: string;
     volume: string;
     grup_mobil_id: string;
+    lokasi_kuari_id: string;
   }
-  const [massRows, setMassRows] = useState<MassRow[]>([{ id: 1, plat_nomor: '', volume: '', grup_mobil_id: '' }]);
+  const [massRows, setMassRows] = useState<MassRow[]>([{ id: 1, plat_nomor: '', volume: '', grup_mobil_id: '', lokasi_kuari_id: '' }]);
 
   // Filter View State
   const [viewSearch, setViewSearch] = useState('');
@@ -110,10 +110,12 @@ export default function Trips() {
 
   // Filter Print / Excel State
   const [printModalOpen, setPrintModalOpen] = useState(false);
-  const [actionType, setActionType] = useState<'print' | 'excel'>('print');
+  const [previewTripsOpen, setPreviewTripsOpen] = useState(false);
+  const [actionType, setActionType] = useState<'print' | 'excel' | 'view'>('print');
   const [filterStart, setFilterStart] = useState('');
   const [filterEnd, setFilterEnd] = useState('');
   const [filterProyekId, setFilterProyekId] = useState('');
+  const [filterGrupId, setFilterGrupId] = useState('');
   const [showRingkasanKuari, setShowRingkasanKuari] = useState(true);
   const [hargaMaterialMap, setHargaMaterialMap] = useState<Record<number, number>>({});
 
@@ -139,8 +141,12 @@ export default function Trips() {
       result = result.filter(t => allowedProyekLokasiIds.includes(t.proyek_lokasi_id));
     }
     
+    if (filterGrupId && filterGrupId !== 'all') {
+      result = result.filter(t => t.grup_mobil_id === Number(filterGrupId));
+    }
+    
     return result;
-  }, [trips, filterStart, filterEnd, filterProyekId, proyekLokasis]);
+  }, [trips, filterStart, filterEnd, filterProyekId, filterGrupId, proyekLokasis]);
 
   // Unique Kuaris in Filtered Trips
   const uniqueKuaris = useMemo(() => {
@@ -303,7 +309,8 @@ export default function Trips() {
   // Mass Input Functions
   const addMassRow = () => {
     const lastGrup = massRows.length > 0 ? massRows[massRows.length - 1].grup_mobil_id : '';
-    setMassRows([...massRows, { id: Date.now(), plat_nomor: '', volume: '', grup_mobil_id: lastGrup }]);
+    const lastKuari = massRows.length > 0 ? massRows[massRows.length - 1].lokasi_kuari_id : '';
+    setMassRows([...massRows, { id: Date.now(), plat_nomor: '', volume: '', grup_mobil_id: lastGrup, lokasi_kuari_id: lastKuari }]);
   };
 
   const removeMassRow = (id: number) => {
@@ -334,14 +341,14 @@ export default function Trips() {
   };
 
   const handleSaveMass = async () => {
-    if (!massTglMuat || !massTglBongkar || !massJasaId || !massProyekLokasiId || !massKuariId || !massHargaTrip) {
+    if (!massTglMuat || !massTglBongkar || !massJasaId || !massProyekLokasiId || !massHargaTrip) {
       toast.error('Harap isi semua atribut global di bagian atas.');
       return;
     }
 
-    const invalidRows = massRows.filter(r => !r.plat_nomor || !r.volume || !r.grup_mobil_id);
+    const invalidRows = massRows.filter(r => !r.plat_nomor || !r.volume || !r.grup_mobil_id || !r.lokasi_kuari_id);
     if (invalidRows.length > 0) {
-      toast.error('Harap lengkapi plat nomor, volume, dan grup pada semua baris.');
+      toast.error('Harap lengkapi plat nomor, volume, grup, dan kuari pada semua baris.');
       return;
     }
 
@@ -349,7 +356,7 @@ export default function Trips() {
     const tripsToInsert = massRows.map(r => ({
       grup_mobil_id: Number(r.grup_mobil_id),
       plat_nomor: r.plat_nomor.toUpperCase(),
-      lokasi_kuari_id: Number(massKuariId),
+      lokasi_kuari_id: Number(r.lokasi_kuari_id),
       proyek_lokasi_id: Number(massProyekLokasiId),
       jenis_jasa_id: Number(massJasaId),
       volume: Number(r.volume),
@@ -367,7 +374,7 @@ export default function Trips() {
       await db.trips.bulkAdd(tripsToInsert);
       toast.success(`${tripsToInsert.length} Trip berhasil ditambahkan secara massal!`);
       setActiveTab('data');
-      setMassRows([{ id: Date.now(), plat_nomor: '', volume: '', grup_mobil_id: '' }]);
+      setMassRows([{ id: Date.now(), plat_nomor: '', volume: '', grup_mobil_id: '', lokasi_kuari_id: '' }]);
     } catch {
       toast.error('Gagal menyimpan trip massal.');
     }
@@ -411,11 +418,12 @@ export default function Trips() {
   };
 
   // Export / Print
-  const handleOpenFilter = (type: 'print' | 'excel') => {
+  const handleOpenFilter = (type: 'print' | 'excel' | 'view') => {
     setActionType(type);
     setFilterStart('');
     setFilterEnd('');
     setFilterProyekId('all');
+    setFilterGrupId('all');
     setShowRingkasanKuari(true);
     setHargaMaterialMap({});
     setPrintModalOpen(true);
@@ -431,6 +439,8 @@ export default function Trips() {
 
     if (actionType === 'excel') {
       doExportExcel();
+    } else if (actionType === 'view') {
+      setPreviewTripsOpen(true);
     } else {
       setTimeout(() => {
         printWithTitle(`Rekap_Trip_${filterStart ? filterStart : 'All'}`);
@@ -520,6 +530,7 @@ export default function Trips() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Riwayat Trip</CardTitle>
               <div className="flex gap-2 items-center flex-wrap">
+                <Button variant="outline" size="sm" onClick={() => handleOpenFilter('view')}><Eye className="w-4 h-4 mr-2" /> View</Button>
                 <Button variant="outline" size="sm" onClick={() => handleOpenFilter('excel')}><Download className="w-4 h-4 mr-2" /> Excel</Button>
                 <Button variant="outline" size="sm" onClick={() => handleOpenFilter('print')}><Printer className="w-4 h-4 mr-2" /> Print PDF</Button>
                 <div className="w-px h-6 bg-border mx-1 hidden sm:block"></div>
@@ -754,13 +765,6 @@ export default function Trips() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Kuari Asal</Label>
-                  <Select value={massKuariId} onValueChange={setMassKuariId}>
-                    <SelectTrigger><SelectValue placeholder="Pilih Kuari" /></SelectTrigger>
-                    <SelectContent>{kuaris?.map(k => <SelectItem key={k.id} value={k.id!.toString()}>{k.nama_lokasi}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
                   <Label>Jenis Jasa</Label>
                   <Select value={massJasaId} onValueChange={setMassJasaId}>
                     <SelectTrigger><SelectValue placeholder="Pilih Jasa" /></SelectTrigger>
@@ -777,8 +781,9 @@ export default function Trips() {
               <div className="space-y-4">
                 <div className="hidden md:grid grid-cols-12 gap-4 px-2 font-semibold text-sm text-muted-foreground">
                   <div className="col-span-3">Plat Nomor</div>
-                  <div className="col-span-3">Volume</div>
-                  <div className="col-span-5">Grup Mobil (Otomatis/Manual)</div>
+                  <div className="col-span-2">Volume</div>
+                  <div className="col-span-3">Kuari Asal</div>
+                  <div className="col-span-3">Grup Mobil</div>
                   <div className="col-span-1 text-center">Hapus</div>
                 </div>
 
@@ -793,7 +798,7 @@ export default function Trips() {
                         className="uppercase"
                       />
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-2">
                       <Label className="md:hidden text-xs mb-1 block">Volume</Label>
                       <Input 
                         type="number" 
@@ -802,7 +807,16 @@ export default function Trips() {
                         onChange={e => handleMassRowChange(row.id, 'volume', e.target.value)} 
                       />
                     </div>
-                    <div className="col-span-5">
+                    <div className="col-span-3">
+                      <Label className="md:hidden text-xs mb-1 block">Kuari Asal</Label>
+                      <Select value={row.lokasi_kuari_id} onValueChange={val => handleMassRowChange(row.id, 'lokasi_kuari_id', val)}>
+                        <SelectTrigger><SelectValue placeholder="Pilih Kuari" /></SelectTrigger>
+                        <SelectContent>
+                          {kuaris?.map(k => <SelectItem key={k.id} value={k.id!.toString()}>{k.nama_lokasi}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-3">
                       <Label className="md:hidden text-xs mb-1 block">Grup Mobil</Label>
                       <Select value={row.grup_mobil_id} onValueChange={val => handleMassRowChange(row.id, 'grup_mobil_id', val)}>
                         <SelectTrigger><SelectValue placeholder="Pilih Grup" /></SelectTrigger>
@@ -854,20 +868,32 @@ export default function Trips() {
               </div>
             </div>
 
-            <div className="space-y-2 mt-4">
-              <Label>Pilih Proyek (Opsional)</Label>
-              <Select value={filterProyekId} onValueChange={setFilterProyekId}>
-                <SelectTrigger><SelectValue placeholder="Semua Proyek" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Proyek</SelectItem>
-                  {proyeks?.map(p => <SelectItem key={p.id} value={p.id!.toString()}>{p.nama_proyek}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="space-y-2">
+                <Label>Pilih Proyek (Opsional)</Label>
+                <Select value={filterProyekId} onValueChange={setFilterProyekId}>
+                  <SelectTrigger><SelectValue placeholder="Semua Proyek" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Proyek</SelectItem>
+                    {proyeks?.map(p => <SelectItem key={p.id} value={p.id!.toString()}>{p.nama_proyek}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Pilih Grup (Opsional)</Label>
+                <Select value={filterGrupId} onValueChange={setFilterGrupId}>
+                  <SelectTrigger><SelectValue placeholder="Semua Grup" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Grup</SelectItem>
+                    {grupMobils?.map(g => <SelectItem key={g.id} value={g.id!.toString()}>{g.nama_grup}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             
             <div className="flex items-center gap-2 p-3 border rounded-lg bg-muted/50 mt-4 cursor-pointer" onClick={() => setShowRingkasanKuari(!showRingkasanKuari)}>
               <div className={`p-1 rounded ${showRingkasanKuari ? 'bg-primary text-primary-foreground' : 'border bg-background text-transparent'}`}>
-                <CheckSquare className="w-4 h-4" />
+                <FileText className="w-4 h-4" />
               </div>
               <span className="font-medium select-none">Tampilkan Ringkasan Kuari/Material?</span>
             </div>
@@ -897,6 +923,36 @@ export default function Trips() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPrintModalOpen(false)}>Batal</Button>
             <Button onClick={executeAction}>Lanjutkan {actionType === 'print' ? 'Cetak' : 'Unduh'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Modal */}
+      <Dialog open={previewTripsOpen} onOpenChange={setPreviewTripsOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="print:hidden">
+            <DialogTitle>Preview Rekap Trip</DialogTitle>
+          </DialogHeader>
+          <div className="bg-gray-100 p-4 rounded-md">
+            <PrintRekapTrips
+              trips={filteredTrips}
+              proyeks={proyeks || []}
+              lokasiProyeks={lokasiProyeks || []}
+              proyekLokasis={proyekLokasis || []}
+              lokasiKuaris={kuaris || []}
+              showRingkasanKuari={showRingkasanKuari}
+              hargaMaterialMap={hargaMaterialMap}
+              previewMode={true}
+            />
+          </div>
+          <DialogFooter className="print:hidden">
+            <Button variant="outline" onClick={() => setPreviewTripsOpen(false)}>Tutup</Button>
+            <Button onClick={() => {
+              setPreviewTripsOpen(false);
+              setTimeout(() => {
+                printWithTitle(`Rekap_Trip_${filterStart ? filterStart : 'All'}`);
+              }, 500);
+            }}><Printer className="w-4 h-4 mr-2" /> Cetak Sekarang</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

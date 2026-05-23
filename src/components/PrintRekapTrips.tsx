@@ -11,6 +11,7 @@ interface PrintRekapTripsProps {
 
   showRingkasanKuari?: boolean;
   hargaMaterialMap?: Record<number, number>;
+  previewMode?: boolean;
 }
 
 export default function PrintRekapTrips({
@@ -21,7 +22,8 @@ export default function PrintRekapTrips({
   lokasiKuaris,
 
   showRingkasanKuari = true,
-  hargaMaterialMap = {}
+  hargaMaterialMap = {},
+  previewMode = false
 }: PrintRekapTripsProps) {
 
   // Group by Proyek
@@ -49,7 +51,7 @@ export default function PrintRekapTrips({
   };
 
   return (
-    <div className="hidden print:block printable-invoice text-[12px] p-0" style={{ boxShadow: 'none' }}>
+    <div className={`${previewMode ? 'bg-white p-8 text-black w-full min-w-[800px]' : 'hidden print:block'} printable-invoice text-[12px] p-0`} style={{ boxShadow: 'none' }}>
       {Object.entries(groupedByProyek).map(([namaProyek, tripsProyek], projIdx, projArr) => {
         
         const dates = tripsProyek.map(t => new Date(t.tanggal_bongkar).getTime());

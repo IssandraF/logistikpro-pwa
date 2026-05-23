@@ -10,10 +10,11 @@ interface PrintKasbonGrupProps {
   proyekLokasis: ProyekLokasi[];
   lokasiProyeks: LokasiProyek[];
   lokasiKuaris: LokasiKuari[];
+  previewMode?: boolean;
 }
 
 export default function PrintKasbonGrup({
-  grupMobil, pinjaman, mutasis, slips, allTrips, proyekLokasis, lokasiProyeks, lokasiKuaris
+  grupMobil, pinjaman, mutasis, slips, allTrips, proyekLokasis, lokasiProyeks, lokasiKuaris, previewMode = false
 }: PrintKasbonGrupProps) {
 
   // Urutkan mutasi berdasarkan tanggal (ascending) untuk menghitung saldo berjalan
@@ -32,7 +33,7 @@ export default function PrintKasbonGrup({
   const currentSaldo = mutasiWithSaldo.length > 0 ? mutasiWithSaldo[mutasiWithSaldo.length - 1].calculatedSaldo : 0;
 
   return (
-    <div className="hidden print:block printable-invoice">
+    <div className={`${previewMode ? 'bg-white p-8 text-black w-full min-w-[800px]' : 'hidden print:block'} printable-invoice`}>
       <div className="text-center mb-6">
         <h2 className="text-[20px] font-bold m-0 p-0">RINGKASAN BUKU BESAR KAS BON VENDOR</h2>
         <p className="m-0 p-0 text-gray-600"><strong>{grupMobil.nama_grup.toUpperCase()}</strong> | Tgl Cetak: {format(new Date(), 'dd/MM/yyyy HH:mm')}</p>

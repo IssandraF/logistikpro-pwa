@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { FileText, Printer, FileDown, HandCoins, Trash2, Edit } from 'lucide-react';
+import { FileText, Printer, FileDown, HandCoins, Trash2, Edit, Eye } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import PrintSlip from '@/components/PrintSlip';
@@ -354,12 +354,18 @@ export default function Slips() {
     XLSX.writeFile(wb, `Slip_${slip.nomor_slip.replace(/[/\\?%*:|"<>]/g, '_')}.xlsx`);
   };
 
+  const [previewSlipOpen, setPreviewSlipOpen] = useState(false);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handlePrintClick = (slip: any) => {
+  const handleActionSlip = (slip: any, mode: 'print' | 'view') => {
     setSlipToPrint(slip);
-    setTimeout(() => {
-      printWithTitle(`Slip_${slip.grup_mobil_id}_${slip.nomor_slip.replace(/[/\\?%*:|"<>]/g, '_')}`);
-    }, 500);
+    if (mode === 'print') {
+      setTimeout(() => {
+        printWithTitle(`Slip_${slip.grup_mobil_id}_${slip.nomor_slip.replace(/[/\\?%*:|"<>]/g, '_')}`);
+      }, 500);
+    } else {
+      setPreviewSlipOpen(true);
+    }
   };
 
   return (
@@ -411,7 +417,10 @@ export default function Slips() {
                           <Button variant="outline" size="sm" onClick={() => exportExcelSingle(s)}>
                             <FileDown className="w-4 h-4 text-green-600" />
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => handlePrintClick(s)}>
+                          <Button variant="outline" size="sm" onClick={() => handleActionSlip(s, 'view')}>
+                            <Eye className="w-4 h-4 text-green-600" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleActionSlip(s, 'print')}>
                             <Printer className="w-4 h-4 text-blue-600" />
                           </Button>
                           <Button variant="outline" size="sm" onClick={() => openEditModal(s)}>
@@ -613,6 +622,37 @@ export default function Slips() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditModalOpen(false)}>Batal</Button>
             <Button onClick={handleUpdateSlip}>Simpan Perubahan</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Modal */}
+      <Dialog open={previewSlipOpen} onOpenChange={setPreviewSlipOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="print:hidden">
+            <DialogTitle>Preview Slip Pembayaran</DialogTitle>
+          </DialogHeader>
+          <div className="bg-gray-100 p-4 rounded-md">
+            {slipToPrint && tripsForPrint && printGrupMobil && proyekLokasis && lokasiProyeks && kuaris && (
+              <PrintSlip
+                slip={slipToPrint}
+                trips={tripsForPrint}
+                grupMobil={printGrupMobil}
+                proyekLokasis={proyekLokasis}
+                lokasiProyeks={lokasiProyeks}
+                lokasiKuaris={kuaris}
+                previewMode={true}
+              />
+            )}
+          </div>
+          <DialogFooter className="print:hidden">
+            <Button variant="outline" onClick={() => setPreviewSlipOpen(false)}>Tutup</Button>
+            <Button onClick={() => {
+              setPreviewSlipOpen(false);
+              setTimeout(() => {
+                printWithTitle(`Slip_${slipToPrint?.grup_mobil_id}_${slipToPrint?.nomor_slip.replace(/[/\\?%*:|"<>]/g, '_')}`);
+              }, 500);
+            }}><Printer className="w-4 h-4 mr-2" /> Cetak Sekarang</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
