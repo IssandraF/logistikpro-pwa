@@ -106,11 +106,10 @@ export default function Invoices() {
   }, [proyekId, pendingTrips, proyekLokasis, filterAkhir, filterMulai, selectedTripsForInvoice]);
 
   const totalPotongan = useMemo(() => {
-    return kuariSummary.reduce((acc, curr) => {
-      const price = kuariPrices[curr.kuariId] || 0;
-      return acc + (curr.count * price);
-    }, 0);
-  }, [kuariSummary, kuariPrices]);
+    return filteredTrips
+      .filter(t => selectedTripsForInvoice.includes(t.id!))
+      .reduce((sum, t) => sum + (t.potongan_material_invoice || 0), 0);
+  }, [filteredTrips, selectedTripsForInvoice]);
 
   const totalBersih = totalKotor - totalPotongan;
 
