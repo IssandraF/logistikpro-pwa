@@ -111,7 +111,7 @@ export default function Invoices() {
 
 
     return { filteredTrips: filtered, selectedTripsObjects: finalTrips, totalVolume: vol, totalKotor: kotor };
-  }, [proyekId, pendingTrips, proyekLokasis, filterAkhir, filterMulai, selectedTripsForInvoice]);
+  }, [proyekId, allAvailableTrips, proyekLokasis, filterAkhir, filterMulai, selectedTripsForInvoice]);
 
   const totalPotongan = useMemo(() => {
     return filteredTrips
