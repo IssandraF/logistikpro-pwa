@@ -19,6 +19,14 @@ import { exportSmartInvoices, importSmartInvoices } from '@/lib/sync-utils';
 
 export default function Invoices() {
   const [activeTab, setActiveTab] = useState('data');
+  
+  // Edit State
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editInvId, setEditInvId] = useState<number | null>(null);
+  const [editNomor, setEditNomor] = useState('');
+  const [editTgl, setEditTgl] = useState('');
+  const [editKepada, setEditKepada] = useState('');
+  const [editTtd, setEditTtd] = useState('');
 
   const invoices = useLiveQuery(() => db.invoices.reverse().toArray());
   const proyeks = useLiveQuery(() => db.proyeks.where('isDeleted').equals(0).toArray());
@@ -58,14 +66,7 @@ export default function Invoices() {
   const [paperSize, setPaperSize] = useState('A4 portrait');
   const [printScale, setPrintScale] = useState(100);
   
-  // Edit State
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editInvId, setEditInvId] = useState<number | null>(null);
-  const [editNomor, setEditNomor] = useState('');
-  const [editTgl, setEditTgl] = useState('');
-  const [editKepada, setEditKepada] = useState('');
-  const [editTtd, setEditTtd] = useState('');
-  
+
   // Filter Tanggal Trip
   const [filterMulai, setFilterMulai] = useState('');
   const [filterAkhir, setFilterAkhir] = useState('');
