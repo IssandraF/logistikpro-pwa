@@ -291,20 +291,16 @@ export default function Invoices() {
     setActiveTab('create');
   };
 
-  const handleUpdateInvoice = async () => {
-    if (!editInvId || !editNomor || !editTgl) return toast.error('Nomor dan Tanggal wajib diisi');
-    try {
-      await db.invoices.update(editInvId, {
-        nomor_invoice: editNomor,
-        tanggal_invoice: new Date(editTgl),
-        kepada_custom: editKepada || undefined,
-        nama_ttd: editTtd || undefined
-      });
-      toast.success('Invoice berhasil diperbarui');
-      setEditModalOpen(false);
-    } catch {
-      toast.error('Gagal memperbarui invoice');
-    }
+  const handleCancelEdit = () => {
+    setEditInvId(null);
+    setProyekId('');
+    setOwnerId('');
+    setNomorInvoice('');
+    setTglInvoice('');
+    setKepadaCustom('');
+    setNamaTtd('');
+    setSelectedTripsForInvoice([]);
+    setActiveTab('data');
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
