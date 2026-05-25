@@ -24,7 +24,14 @@ export default function Invoices() {
   const proyeks = useLiveQuery(() => db.proyeks.where('isDeleted').equals(0).toArray());
   const jenisJasas = useLiveQuery(() => db.jenisJasas.where('isDeleted').equals(0).toArray());
   const jenisMaterials = useLiveQuery(() => db.jenisMaterials.where('isDeleted').equals(0).toArray());
-  const pendingTrips = useLiveQuery(() => db.trips.filter(t => !t.invoice_id && t.isDeleted === 0).toArray());
+  const pendingTripsQuery = useLiveQuery(() => db.trips.filter(t => !t.invoice_id && t.isDeleted === 0).toArray());
+  const editingTripsQuery = useLiveQuery(
+    async () => editInvId ? await db.trips.filter(t => t.invoice_id === editInvId && t.isDeleted === 0).toArray() : [],
+    [editInvId]
+  );
+  const allAvailableTrips = useMemo(() => {
+    return [...(pendingTripsQuery || []), ...(editingTripsQuery || [])];
+  }, [pendingTripsQuery, editingTripsQuery]);
   const lokasiKuaris = useLiveQuery(() => db.lokasiKuaris.toArray());
   const proyekLokasis = useLiveQuery(() => db.proyekLokasis.toArray());
   const lokasiProyeks = useLiveQuery(() => db.lokasiProyeks.toArray());
@@ -73,13 +80,13 @@ export default function Invoices() {
 
   // Memoized calculations for selected project
   const { filteredTrips, totalVolume, totalKotor } = useMemo(() => {
-    if (!proyekId || !pendingTrips || !proyekLokasis) return { filteredTrips: [], totalVolume: 0, totalKotor: 0 };
+    if (!proyekId || !allAvailableTrips || !proyekLokasis) return { filteredTrips: [], totalVolume: 0, totalKotor: 0 };
     
     // Get all ProyekLokasi IDs for the selected Proyek
     const pId = Number(proyekId);
     const validProyekLokasiIds = proyekLokasis.filter(pl => pl.proyek_id === pId).map(pl => pl.id);
 
-    let filtered = pendingTrips.filter(t => validProyekLokasiIds.includes(t.proyek_lokasi_id));
+    let filtered = allAvailableTrips.filter(t => validProyekLokasiIds.includes(t.proyek_lokasi_id));
 
     if (filterMulai) {
       const start = new Date(filterMulai);
@@ -160,29 +167,56 @@ export default function Invoices() {
     }
 
     try {
-      // 1. Create Invoice
-      const invoiceId = await db.invoices.add({
-        nomor_invoice: nomorInvoice,
-        tanggal_invoice: new Date(tglInvoice),
-        proyek_id: Number(proyekId),
-        owner_id: Number(ownerId),
-        total_kubikasi: totalVolume,
-        total_harga_kotor: totalKotor,
-        is_potong_material: totalPotongan > 0 ? 1 : 0,
-        total_potongan_material: totalPotongan,
-        total_harga_bersih: totalBersih,
-        kepada_custom: kepadaCustom || undefined,
-        nama_ttd: namaTtd || undefined,
-        status: 'draft',
-        createdAt: new Date()
-      });
+      if (editInvId) {
+        await db.invoices.update(editInvId, {
+          nomor_invoice: nomorInvoice,
+          tanggal_invoice: new Date(tglInvoice),
+          proyek_id: Number(proyekId),
+          owner_id: Number(ownerId),
+          total_kubikasi: totalVolume,
+          total_harga_kotor: totalKotor,
+          is_potong_material: totalPotongan > 0 ? 1 : 0,
+          total_potongan_material: totalPotongan,
+          total_harga_bersih: totalBersih,
+          kepada_custom: kepadaCustom || undefined,
+          nama_ttd: namaTtd || undefined,
+        });
+        
+        // Remove old trips
+        const oldTrips = editingTripsQuery || [];
+        const oldIds = oldTrips.map(t => t.id!);
+        const unselected = oldIds.filter(id => !selectedTripsForInvoice.includes(id));
+        if (unselected.length > 0) {
+          await db.trips.where('id').anyOf(unselected).modify({ invoice_id: null });
+        }
+        // Update newly selected
+        await db.trips.where('id').anyOf(selectedTripsForInvoice).modify({ invoice_id: editInvId });
 
-      // 2. Quarry Prices no longer used since it's directly on trip
+        toast.success('Invoice berhasil diupdate!');
+      } else {
+        // 1. Create Invoice
+        const invoiceId = await db.invoices.add({
+          nomor_invoice: nomorInvoice,
+          tanggal_invoice: new Date(tglInvoice),
+          proyek_id: Number(proyekId),
+          owner_id: Number(ownerId),
+          total_kubikasi: totalVolume,
+          total_harga_kotor: totalKotor,
+          is_potong_material: totalPotongan > 0 ? 1 : 0,
+          total_potongan_material: totalPotongan,
+          total_harga_bersih: totalBersih,
+          kepada_custom: kepadaCustom || undefined,
+          nama_ttd: namaTtd || undefined,
+          status: 'draft',
+          createdAt: new Date()
+        });
 
-      // 3. Update Trips
-      await db.trips.where('id').anyOf(selectedTripsForInvoice).modify({ invoice_id: Number(invoiceId) });
+        // 2. Update Trips
+        await db.trips.where('id').anyOf(selectedTripsForInvoice).modify({ invoice_id: Number(invoiceId) });
 
-      toast.success('Invoice berhasil dibuat!');
+        toast.success('Invoice berhasil dibuat!');
+      }
+
       setActiveTab('data');
       
       // Reset Form
@@ -194,8 +228,9 @@ export default function Invoices() {
       setFilterMulai('');
       setFilterAkhir('');
       setSelectedTripsForInvoice([]);
+      setEditInvId(null);
     } catch {
-      toast.error('Gagal membuat invoice');
+      toast.error('Gagal menyimpan invoice');
     }
   };
 
@@ -240,14 +275,19 @@ export default function Invoices() {
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const openEditModal = (inv: any) => {
+  const handleEditInvoiceFull = async (inv: any) => {
     setEditInvId(inv.id);
-    setEditNomor(inv.nomor_invoice);
-    setEditTgl(format(new Date(inv.tanggal_invoice), 'yyyy-MM-dd'));
-    setEditKepada(inv.kepada_custom || '');
-    setEditTtd(inv.nama_ttd || '');
-    setEditModalOpen(true);
+    setProyekId(inv.proyek_id.toString());
+    setOwnerId(inv.owner_id.toString());
+    setNomorInvoice(inv.nomor_invoice);
+    setTglInvoice(format(new Date(inv.tanggal_invoice), 'yyyy-MM-dd'));
+    setKepadaCustom(inv.kepada_custom || '');
+    setNamaTtd(inv.nama_ttd || '');
+    
+    const invTrips = await db.trips.filter(t => t.invoice_id === inv.id && t.isDeleted === 0).toArray();
+    setSelectedTripsForInvoice(invTrips.map(t => t.id!));
+    
+    setActiveTab('create');
   };
 
   const handleUpdateInvoice = async () => {
@@ -328,7 +368,7 @@ export default function Invoices() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="print:hidden">
         <TabsList className="mb-4">
           <TabsTrigger value="data">Data Invoice</TabsTrigger>
-          <TabsTrigger value="create">Buat Invoice Baru</TabsTrigger>
+          <TabsTrigger value="create">{editInvId ? 'Edit Invoice' : 'Buat Invoice Baru'}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="data">
@@ -374,7 +414,7 @@ export default function Invoices() {
                           <Button variant="outline" size="sm" onClick={() => handlePrintClick(inv)}>
                             <Printer className="w-4 h-4 text-blue-600" />
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => openEditModal(inv)}>
+                          <Button variant="outline" size="sm" onClick={() => handleEditInvoiceFull(inv)}>
                             <Edit className="w-4 h-4 text-orange-600" />
                           </Button>
                           <Button variant="outline" size="sm" onClick={() => handleDeleteInvoice(inv)}>
@@ -545,16 +585,25 @@ export default function Invoices() {
                      </div>
                    </div>
 
-                   {/* Harga Potongan Per Kuari Removed */}
+                   {editInvId && (
+                     <div className="bg-amber-100 text-amber-900 p-3 rounded text-sm mb-4">
+                       Sedang mengedit Invoice: <strong>{nomorInvoice}</strong>
+                     </div>
+                   )}
 
                    <div className="flex justify-between items-center p-4 bg-primary/10 border border-primary/20 rounded">
                      <span className="font-semibold">Total Bersih yang Ditagihkan:</span>
                      <span className="text-2xl font-bold text-primary">Rp {totalBersih.toLocaleString('id-ID')}</span>
                    </div>
 
-                    <Button onClick={handleCreateInvoice} className="w-full mt-6" size="lg">
-                     <FileText className="w-4 h-4 mr-2" /> Simpan Invoice Final
-                   </Button>
+                    <div className="flex justify-end gap-2 mt-4">
+                      {editInvId && (
+                        <Button variant="outline" onClick={handleCancelEdit}>Batal Edit</Button>
+                      )}
+                      <Button onClick={handleCreateInvoice} className="w-full md:w-auto" size="lg">
+                        <FileText className="w-4 h-4 mr-2" /> {editInvId ? 'Update Invoice' : 'Simpan Invoice Final'}
+                      </Button>
+                    </div>
                  </div>
                  </div>
                )}
@@ -604,35 +653,6 @@ export default function Invoices() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPrintModalOpen(false)}>Batal</Button>
             <Button onClick={executePrint}><Printer className="w-4 h-4 mr-2" /> Proses Cetak PDF</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Modal */}
-      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Edit Metadata Invoice</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Nomor Invoice</Label>
-              <Input value={editNomor} onChange={e => setEditNomor(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Tanggal Invoice</Label>
-              <Input type="date" value={editTgl} onChange={e => setEditTgl(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Kepada (Custom)</Label>
-              <Input value={editKepada} onChange={e => setEditKepada(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Nama Penanda Tangan</Label>
-              <Input value={editTtd} onChange={e => setEditTtd(e.target.value)} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditModalOpen(false)}>Batal</Button>
-            <Button onClick={handleUpdateInvoice}>Simpan Perubahan</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
