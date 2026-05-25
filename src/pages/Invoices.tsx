@@ -22,6 +22,8 @@ export default function Invoices() {
 
   const invoices = useLiveQuery(() => db.invoices.reverse().toArray());
   const proyeks = useLiveQuery(() => db.proyeks.where('isDeleted').equals(0).toArray());
+  const jenisJasas = useLiveQuery(() => db.jenisJasas.where('isDeleted').equals(0).toArray());
+  const jenisMaterials = useLiveQuery(() => db.jenisMaterials.where('isDeleted').equals(0).toArray());
   const pendingTrips = useLiveQuery(() => db.trips.filter(t => !t.invoice_id && t.isDeleted === 0).toArray());
   const lokasiKuaris = useLiveQuery(() => db.lokasiKuaris.toArray());
   const proyekLokasis = useLiveQuery(() => db.proyekLokasis.toArray());
@@ -61,12 +63,17 @@ export default function Invoices() {
   const [filterMulai, setFilterMulai] = useState('');
   const [filterAkhir, setFilterAkhir] = useState('');
   
+  // Trip Selection & Mass Update
+  const [selectedTripsForInvoice, setSelectedTripsForInvoice] = useState<number[]>([]);
+  const [massUpdateJasaId, setMassUpdateJasaId] = useState('');
+  const [massUpdateMaterialId, setMassUpdateMaterialId] = useState('');
+  
   // Kuari prices state: { [kuari_id]: harga_potong }
-  const [kuariPrices, setKuariPrices] = useState<Record<number, number>>({});
+  const [massUpdatePotongan, setMassUpdatePotongan] = useState('');
 
   // Memoized calculations for selected project
-  const { filteredTrips, kuariSummary, totalVolume, totalKotor } = useMemo(() => {
-    if (!proyekId || !pendingTrips || !proyekLokasis) return { filteredTrips: [], kuariSummary: [], totalVolume: 0, totalKotor: 0 };
+  const { filteredTrips, totalVolume, totalKotor } = useMemo(() => {
+    if (!proyekId || !pendingTrips || !proyekLokasis) return { filteredTrips: [], totalVolume: 0, totalKotor: 0 };
     
     // Get all ProyekLokasi IDs for the selected Proyek
     const pId = Number(proyekId);
@@ -84,23 +91,19 @@ export default function Invoices() {
       filtered = filtered.filter(t => new Date(t.tanggal_bongkar) <= end);
     }
     
+    const finalTrips = filtered.filter(t => selectedTripsForInvoice.includes(t.id!));
+    
     let vol = 0;
     let kotor = 0;
-    const kuariMap: Record<number, number> = {}; // kuari_id -> trip count
 
-    filtered.forEach(t => {
+    finalTrips.forEach(t => {
       vol += t.volume;
       kotor += t.total_harga;
-      kuariMap[t.lokasi_kuari_id] = (kuariMap[t.lokasi_kuari_id] || 0) + 1;
     });
 
-    const summary = Object.keys(kuariMap).map(kId => ({
-      kuariId: Number(kId),
-      count: kuariMap[Number(kId)]
-    }));
 
-    return { filteredTrips: filtered, kuariSummary: summary, totalVolume: vol, totalKotor: kotor };
-  }, [proyekId, pendingTrips, proyekLokasis, filterAkhir, filterMulai]);
+    return { filteredTrips: filtered, selectedTripsObjects: finalTrips, totalVolume: vol, totalKotor: kotor };
+  }, [proyekId, pendingTrips, proyekLokasis, filterAkhir, filterMulai, selectedTripsForInvoice]);
 
   const totalPotongan = useMemo(() => {
     return kuariSummary.reduce((acc, curr) => {
@@ -111,8 +114,39 @@ export default function Invoices() {
 
   const totalBersih = totalKotor - totalPotongan;
 
-  const handlePriceChange = (kId: number, val: string) => {
-    setKuariPrices(prev => ({ ...prev, [kId]: Number(val) }));
+  // Removed handlePriceChange
+
+  const handleSelectAllTrips = () => {
+    if (filteredTrips.length === selectedTripsForInvoice.length) {
+      setSelectedTripsForInvoice([]);
+    } else {
+      setSelectedTripsForInvoice(filteredTrips.map(t => t.id!));
+    }
+  };
+
+  const toggleTripSelection = (tripId: number) => {
+    if (selectedTripsForInvoice.includes(tripId)) {
+      setSelectedTripsForInvoice(selectedTripsForInvoice.filter(id => id !== tripId));
+    } else {
+      setSelectedTripsForInvoice([...selectedTripsForInvoice, tripId]);
+    }
+  };
+
+  const handleMassUpdateTrips = async () => {
+    if (selectedTripsForInvoice.length === 0) return toast.error('Pilih trip terlebih dahulu');
+    if (!massUpdateJasaId && !massUpdateMaterialId && !massUpdatePotongan) return toast.error('Pilih setidaknya satu jenis untuk diupdate');
+
+    try {
+      const updates: Record<string, number | null> = {};
+      if (massUpdateJasaId) updates.jenis_jasa_id = massUpdateJasaId === 'null' ? null : Number(massUpdateJasaId);
+      if (massUpdateMaterialId) updates.jenis_material_id = massUpdateMaterialId === 'null' ? null : Number(massUpdateMaterialId);
+      if (massUpdatePotongan) updates.potongan_material_invoice = Number(massUpdatePotongan);
+
+      await db.trips.where('id').anyOf(selectedTripsForInvoice).modify(updates);
+      toast.success(`${selectedTripsForInvoice.length} Trip berhasil diupdate!`);
+    } catch {
+      toast.error('Gagal update trip');
+    }
   };
 
   const handleCreateInvoice = async () => {
@@ -121,8 +155,8 @@ export default function Invoices() {
       return;
     }
 
-    if (filteredTrips.length === 0) {
-      toast.error('Tidak ada trip pending untuk proyek ini');
+    if (selectedTripsForInvoice.length === 0) {
+      toast.error('Tidak ada trip yang dipilih untuk invoice ini');
       return;
     }
 
@@ -144,21 +178,10 @@ export default function Invoices() {
         createdAt: new Date()
       });
 
-      // 2. Add Quarry Prices if any
-      for (const summary of kuariSummary) {
-        if (kuariPrices[summary.kuariId]) {
-          await db.invoiceQuarryPrices.add({
-            invoice_id: Number(invoiceId),
-            lokasi_kuari_id: summary.kuariId,
-            jumlah_trip: summary.count,
-            harga_material_override: kuariPrices[summary.kuariId]
-          });
-        }
-      }
+      // 2. Quarry Prices no longer used since it's directly on trip
 
       // 3. Update Trips
-      const tripIds = filteredTrips.map(t => t.id!);
-      await db.trips.where('id').anyOf(tripIds).modify({ invoice_id: Number(invoiceId) });
+      await db.trips.where('id').anyOf(selectedTripsForInvoice).modify({ invoice_id: Number(invoiceId) });
 
       toast.success('Invoice berhasil dibuat!');
       setActiveTab('data');
@@ -167,10 +190,11 @@ export default function Invoices() {
       setProyekId('');
       setNomorInvoice('');
       setTglInvoice('');
-      setKuariPrices({});
+      setMassUpdatePotongan('');
       setKepadaCustom('');
       setFilterMulai('');
       setFilterAkhir('');
+      setSelectedTripsForInvoice([]);
     } catch {
       toast.error('Gagal membuat invoice');
     }
@@ -416,15 +440,101 @@ export default function Invoices() {
                   <Input value={namaTtd} onChange={e => setNamaTtd(e.target.value)} placeholder="Misal: Bapak Budi" />
                 </div>
                </div>
-               
+
                {proyekId && (
-                 <div className="p-4 bg-muted/50 rounded-md mt-6 border">
+                 <div className="space-y-4">
+                   <div className="p-4 bg-muted/50 rounded-md border">
+                     <h3 className="font-semibold mb-4 text-lg">Trip Tersedia untuk Di-Invoice</h3>
+                     
+                     {selectedTripsForInvoice.length > 0 && (
+                       <div className="flex flex-col md:flex-row items-end gap-4 p-3 bg-primary/5 rounded border border-primary/20 mb-4 animate-in fade-in">
+                         <div className="space-y-2 flex-1">
+                           <Label>Ubah Massal Jenis Jasa (Opsional)</Label>
+                           <Select value={massUpdateJasaId} onValueChange={setMassUpdateJasaId}>
+                             <SelectTrigger><SelectValue placeholder="Biarkan / Pilih Jasa" /></SelectTrigger>
+                             <SelectContent>
+                               <SelectItem value="null">-- Kosongkan Jasa --</SelectItem>
+                               {jenisJasas?.map(j => <SelectItem key={j.id} value={j.id!.toString()}>{j.nama_js}</SelectItem>)}
+                             </SelectContent>
+                           </Select>
+                         </div>
+                         <div className="space-y-2 flex-1">
+                           <Label>Ubah Massal Jenis Material (Opsional)</Label>
+                           <Select value={massUpdateMaterialId} onValueChange={setMassUpdateMaterialId}>
+                             <SelectTrigger><SelectValue placeholder="Biarkan / Pilih Material" /></SelectTrigger>
+                             <SelectContent>
+                               <SelectItem value="null">-- Kosongkan Material --</SelectItem>
+                               {jenisMaterials?.map(m => <SelectItem key={m.id} value={m.id!.toString()}>{m.nama_material}</SelectItem>)}
+                             </SelectContent>
+                           </Select>
+                         </div>
+                         <div className="space-y-2 flex-1">
+                           <Label>Potongan Material (Rp) (Opsional)</Label>
+                           <Input 
+                             type="number" 
+                             placeholder="Nominal potongan per trip terpilih" 
+                             value={massUpdatePotongan} 
+                             onChange={e => setMassUpdatePotongan(e.target.value)} 
+                           />
+                         </div>
+                         <Button variant="secondary" onClick={handleMassUpdateTrips}>Terapkan</Button>
+                       </div>
+                     )}
+
+                     <div className="overflow-x-auto border rounded bg-background max-h-[400px] overflow-y-auto">
+                       <table className="w-full text-sm text-left">
+                         <thead className="bg-muted sticky top-0 border-b">
+                           <tr>
+                             <th className="p-3 w-12 text-center">
+                               <input 
+                                 type="checkbox" 
+                                 className="w-4 h-4 cursor-pointer accent-primary"
+                                 checked={filteredTrips.length > 0 && selectedTripsForInvoice.length === filteredTrips.length} 
+                                 onChange={handleSelectAllTrips} 
+                               />
+                             </th>
+                             <th className="p-3">Tgl Bongkar</th>
+                             <th className="p-3">Plat Nomor</th>
+                             <th className="p-3">Jenis Jasa</th>
+                             <th className="p-3">Jenis Material</th>
+                             <th className="p-3 text-right">Volume</th>
+                             <th className="p-3 text-right">Potongan (Rp)</th>
+                             <th className="p-3 text-right">Harga Total</th>
+                           </tr>
+                         </thead>
+                         <tbody>
+                           {filteredTrips.map(t => (
+                             <tr key={t.id} className={`border-b ${selectedTripsForInvoice.includes(t.id!) ? 'bg-primary/5' : ''}`}>
+                               <td className="p-3 text-center">
+                                 <input 
+                                   type="checkbox" 
+                                   className="w-4 h-4 cursor-pointer accent-primary"
+                                   checked={selectedTripsForInvoice.includes(t.id!)}
+                                   onChange={() => toggleTripSelection(t.id!)}
+                                 />
+                               </td>
+                               <td className="p-3">{format(new Date(t.tanggal_bongkar), 'dd/MM/yyyy')}</td>
+                               <td className="p-3 font-medium">{t.plat_nomor}</td>
+                               <td className="p-3">{jenisJasas?.find(j => j.id === t.jenis_jasa_id)?.nama_js}</td>
+                               <td className="p-3">{t.jenis_material_id ? jenisMaterials?.find(m => m.id === t.jenis_material_id)?.nama_material : '-'}</td>
+                               <td className="p-3 text-right">{t.volume}</td>
+                               <td className="p-3 text-right text-red-500">{t.potongan_material_invoice ? `- Rp ${t.potongan_material_invoice.toLocaleString('id-ID')}` : '-'}</td>
+                               <td className="p-3 text-right">{(t.total_harga).toLocaleString('id-ID')}</td>
+                             </tr>
+                           ))}
+                           {filteredTrips.length === 0 && <tr><td colSpan={7} className="p-4 text-center">Tidak ada trip pending.</td></tr>}
+                         </tbody>
+                       </table>
+                     </div>
+                   </div>
+
+                 <div className="p-4 bg-muted/50 rounded-md border">
                    <h3 className="font-semibold mb-4 text-lg">Ringkasan & Potongan Material</h3>
                    
                    <div className="grid grid-cols-2 gap-4 mb-6">
                      <div className="p-4 bg-background border rounded shadow-sm">
-                       <p className="text-sm text-muted-foreground">Total Trip</p>
-                       <p className="text-2xl font-bold">{filteredTrips.length} Rit</p>
+                       <p className="text-sm text-muted-foreground">Total Trip Dipilih</p>
+                       <p className="text-2xl font-bold">{selectedTripsForInvoice.length} Rit</p>
                      </div>
                      <div className="p-4 bg-background border rounded shadow-sm">
                        <p className="text-sm text-muted-foreground">Total Kubikasi</p>
@@ -436,37 +546,17 @@ export default function Invoices() {
                      </div>
                    </div>
 
-                   {kuariSummary.length > 0 && (
-                     <div className="space-y-4 mb-6 bg-background p-4 rounded border">
-                       <p className="font-semibold text-sm">Set Harga Potongan Material per Kuari</p>
-                       {kuariSummary.map(k => (
-                         <div key={k.kuariId} className="flex items-center gap-4">
-                           <div className="flex-1">
-                             <Label>{lokasiKuaris?.find(l => l.id === k.kuariId)?.nama_lokasi} <span className="text-muted-foreground">({k.count} Trip)</span></Label>
-                             <Input 
-                               type="number" 
-                               placeholder="Harga potong (mis: 50000)" 
-                               value={kuariPrices[k.kuariId] || ''} 
-                               onChange={e => handlePriceChange(k.kuariId, e.target.value)}
-                             />
-                           </div>
-                           <div className="w-32 text-right">
-                             <span className="text-sm text-muted-foreground block">Subtotal Potongan:</span>
-                             <span className="font-medium text-destructive">- Rp {((kuariPrices[k.kuariId] || 0) * k.count).toLocaleString('id-ID')}</span>
-                           </div>
-                         </div>
-                       ))}
-                     </div>
-                   )}
+                   {/* Harga Potongan Per Kuari Removed */}
 
                    <div className="flex justify-between items-center p-4 bg-primary/10 border border-primary/20 rounded">
                      <span className="font-semibold">Total Bersih yang Ditagihkan:</span>
                      <span className="text-2xl font-bold text-primary">Rp {totalBersih.toLocaleString('id-ID')}</span>
                    </div>
 
-                   <Button onClick={handleCreateInvoice} className="w-full mt-6" size="lg">
+                    <Button onClick={handleCreateInvoice} className="w-full mt-6" size="lg">
                      <FileText className="w-4 h-4 mr-2" /> Simpan Invoice Final
                    </Button>
+                 </div>
                  </div>
                )}
             </CardContent>
@@ -565,6 +655,8 @@ export default function Invoices() {
                   proyekLokasis={proyekLokasis || []}
                   lokasiProyeks={lokasiProyeks || []}
                   lokasiKuaris={lokasiKuaris || []}
+                  jenisJasas={jenisJasas || []}
+                  jenisMaterials={jenisMaterials || []}
                   includePhotos={includePhotos}
                   paperSize={paperSize}
                   printScale={printScale}
@@ -590,6 +682,8 @@ export default function Invoices() {
           proyekLokasis={proyekLokasis || []}
           lokasiProyeks={lokasiProyeks || []}
           lokasiKuaris={lokasiKuaris || []}
+          jenisJasas={jenisJasas || []}
+          jenisMaterials={jenisMaterials || []}
           includePhotos={includePhotos}
           paperSize={paperSize}
           printScale={printScale}

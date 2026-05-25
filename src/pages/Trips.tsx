@@ -26,6 +26,7 @@ export default function Trips() {
   const proyekLokasis = useLiveQuery(() => db.proyekLokasis.where('isDeleted').equals(0).toArray());
   const kuaris = useLiveQuery(() => db.lokasiKuaris.where('isDeleted').equals(0).toArray());
   const jasas = useLiveQuery(() => db.jenisJasas.where('isDeleted').equals(0).toArray());
+  const jenisMaterials = useLiveQuery(() => db.jenisMaterials.where('isDeleted').equals(0).toArray());
   const proyeks = useLiveQuery(() => db.proyeks.where('isDeleted').equals(0).toArray());
   const lokasiProyeks = useLiveQuery(() => db.lokasiProyeks.where('isDeleted').equals(0).toArray());
   const invoices = useLiveQuery(() => db.invoices.toArray());
@@ -36,6 +37,7 @@ export default function Trips() {
   const [proyekLokasiId, setProyekLokasiId] = useState('');
   const [kuariId, setKuariId] = useState('');
   const [jasaId, setJasaId] = useState('');
+  const [materialId, setMaterialId] = useState('');
   const [volume, setVolume] = useState('');
   const [hargaTrip, setHargaTrip] = useState('');
   const [tglMuat, setTglMuat] = useState('');
@@ -47,6 +49,7 @@ export default function Trips() {
   const [massTglMuat, setMassTglMuat] = useState('');
   const [massTglBongkar, setMassTglBongkar] = useState('');
   const [massJasaId, setMassJasaId] = useState('');
+  const [massMaterialId, setMassMaterialId] = useState('');
   const [massProyekLokasiId, setMassProyekLokasiId] = useState('');
   const [massHargaTrip, setMassHargaTrip] = useState('');
   
@@ -175,6 +178,7 @@ export default function Trips() {
     setProyekLokasiId(t.proyek_lokasi_id.toString());
     setKuariId(t.lokasi_kuari_id.toString());
     setJasaId(t.jenis_jasa_id.toString());
+    setMaterialId(t.jenis_material_id ? t.jenis_material_id.toString() : '');
     setVolume(t.volume.toString());
     setHargaTrip(t.harga_trip.toString());
     setTglMuat(format(new Date(t.tanggal_muat), 'yyyy-MM-dd'));
@@ -185,7 +189,7 @@ export default function Trips() {
 
   const cancelEditTrip = () => {
     setEditingTripId(null);
-    setGrupId(''); setPlatNomor(''); setProyekLokasiId(''); setKuariId(''); setJasaId(''); setVolume(''); setHargaTrip(''); setTglMuat(''); setTglBongkar(''); setPhoto(null);
+    setGrupId(''); setPlatNomor(''); setProyekLokasiId(''); setKuariId(''); setJasaId(''); setMaterialId(''); setVolume(''); setHargaTrip(''); setTglMuat(''); setTglBongkar(''); setPhoto(null);
   };
 
   const syncInvoiceTotals = async (invoiceId: number) => {
@@ -268,6 +272,7 @@ export default function Trips() {
         lokasi_kuari_id: Number(kuariId),
         proyek_lokasi_id: Number(proyekLokasiId),
         jenis_jasa_id: Number(jasaId),
+        jenis_material_id: materialId ? Number(materialId) : null,
         volume: Number(volume),
         harga_trip: Number(hargaTrip),
         total_harga: Number(volume) * Number(hargaTrip),
@@ -288,6 +293,7 @@ export default function Trips() {
         lokasi_kuari_id: Number(kuariId),
         proyek_lokasi_id: Number(proyekLokasiId),
         jenis_jasa_id: Number(jasaId),
+        jenis_material_id: materialId ? Number(materialId) : null,
         volume: Number(volume),
         harga_trip: Number(hargaTrip),
         total_harga: Number(volume) * Number(hargaTrip),
@@ -359,6 +365,7 @@ export default function Trips() {
       lokasi_kuari_id: Number(r.lokasi_kuari_id),
       proyek_lokasi_id: Number(massProyekLokasiId),
       jenis_jasa_id: Number(massJasaId),
+      jenis_material_id: massMaterialId ? Number(massMaterialId) : null,
       volume: Number(r.volume),
       harga_trip: hrgTrip,
       total_harga: Number(r.volume) * hrgTrip,
@@ -701,10 +708,19 @@ export default function Trips() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Jenis Jasa</Label>
+                  <Label>Jenis Pengiriman (Jasa)</Label>
                   <Select value={jasaId} onValueChange={setJasaId}>
-                    <SelectTrigger><SelectValue placeholder="Pilih Jasa" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Pilih Pengiriman" /></SelectTrigger>
                     <SelectContent>{jasas?.map(j => <SelectItem key={j.id} value={j.id!.toString()}>{j.nama_js}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Jenis Material (Opsional)</Label>
+                  <Select value={materialId} onValueChange={setMaterialId}>
+                    <SelectTrigger><SelectValue placeholder="Pilih Material" /></SelectTrigger>
+                    <SelectContent>
+                      {jenisMaterials?.map(m => <SelectItem key={m.id} value={m.id!.toString()}>{m.nama_material}</SelectItem>)}
+                    </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
@@ -765,10 +781,19 @@ export default function Trips() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Jenis Jasa</Label>
+                  <Label>Jenis Pengiriman (Jasa)</Label>
                   <Select value={massJasaId} onValueChange={setMassJasaId}>
-                    <SelectTrigger><SelectValue placeholder="Pilih Jasa" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Pilih Pengiriman" /></SelectTrigger>
                     <SelectContent>{jasas?.map(j => <SelectItem key={j.id} value={j.id!.toString()}>{j.nama_js}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Jenis Material (Opsional)</Label>
+                  <Select value={massMaterialId} onValueChange={setMassMaterialId}>
+                    <SelectTrigger><SelectValue placeholder="Pilih Material" /></SelectTrigger>
+                    <SelectContent>
+                      {jenisMaterials?.map(m => <SelectItem key={m.id} value={m.id!.toString()}>{m.nama_material}</SelectItem>)}
+                    </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">

@@ -59,6 +59,13 @@ export interface JenisJasa {
   isDeleted: number;
 }
 
+export interface JenisMaterial {
+  id?: number;
+  nama_material: string;
+  createdAt: Date;
+  isDeleted: number;
+}
+
 export interface ProyekLokasi {
   id?: number;
   proyek_id: number;
@@ -86,6 +93,8 @@ export interface Trip {
   slip_pembayaran_id: number | null;
   harga_bayar?: number; // diisi ketika dibuat slip pembayaran
   potongan_trip?: number; // potongan material per trip ketika dibuat slip
+  jenis_material_id?: number | null; // untuk mengelompokkan jenis material
+  potongan_material_invoice?: number; // potongan nominal material manual di invoice
   createdAt: Date;
   isDeleted: number;
 }
@@ -166,6 +175,7 @@ class LogistikDatabase extends Dexie {
   lokasiProyeks!: Table<LokasiProyek>;
   lokasiKuaris!: Table<LokasiKuari>;
   jenisJasas!: Table<JenisJasa>;
+  jenisMaterials!: Table<JenisMaterial>;
   proyekLokasis!: Table<ProyekLokasi>;
   trips!: Table<Trip>;
   invoices!: Table<Invoice>;
@@ -199,6 +209,10 @@ class LogistikDatabase extends Dexie {
       owners: '++id, isDeleted'
     }).upgrade(() => {
       // Tambahkan owner_id ke existing invoices jika diperlukan
+    });
+
+    this.version(3).stores({
+      jenisMaterials: '++id, nama_material, isDeleted'
     });
   }
 }

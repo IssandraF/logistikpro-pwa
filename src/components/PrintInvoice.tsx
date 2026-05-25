@@ -11,6 +11,8 @@ interface PrintInvoiceProps {
   proyekLokasis: ProyekLokasi[];
   lokasiProyeks: LokasiProyek[];
   lokasiKuaris: LokasiKuari[];
+  jenisJasas?: { id?: number; nama_js: string }[];
+  jenisMaterials?: { id?: number; nama_material: string }[];
   includePhotos: boolean;
   paperSize?: string;
   printScale?: number;
@@ -25,6 +27,8 @@ export default function PrintInvoice({
   proyekLokasis,
   lokasiProyeks,
   lokasiKuaris,
+  jenisJasas = [],
+  jenisMaterials = [],
   includePhotos,
   paperSize = 'A4 portrait',
   printScale = 100,
@@ -34,10 +38,13 @@ export default function PrintInvoice({
   // Sort Summary Grouped by Muat|Bongkar|Lokasi
   const summaryTrips = [...trips].sort((a, b) => new Date(a.tanggal_bongkar).getTime() - new Date(b.tanggal_bongkar).getTime());
 
-  const groupedSummary = summaryTrips.reduce((acc, t) => {
-    const key = `${format(new Date(t.tanggal_muat), 'yyyy-MM-dd')}|${format(new Date(t.tanggal_bongkar), 'yyyy-MM-dd')}|${t.proyek_lokasi_id}`;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(t);
+  // Split trips by Group (Material or Jasa)
+  const tripGroups = summaryTrips.reduce((acc, t) => {
+    const material = t.jenis_material_id ? jenisMaterials.find(m => m.id === t.jenis_material_id)?.nama_material : null;
+    const jasa = t.jenis_jasa_id ? jenisJasas.find(j => j.id === t.jenis_jasa_id)?.nama_js : null;
+    const label = (material || jasa || 'CBM').toUpperCase(); // Fallback to CBM if empty
+    if (!acc[label]) acc[label] = [];
+    acc[label].push(t);
     return acc;
   }, {} as Record<string, Trip[]>);
 
@@ -69,8 +76,7 @@ export default function PrintInvoice({
     });
   });
 
-  let noSummary = 1;
-  let lastDateCbm: string | null = null;
+  // End of logic before render
 
   return (
     <div className={isPreview ? "printable-invoice bg-white text-black p-8 w-full max-w-4xl mx-auto" : "hidden print:block printable-invoice"}>
@@ -106,81 +112,103 @@ export default function PrintInvoice({
 
       <p className="mb-2">Mohon dibayarkan sesuai dengan rincian berikut:</p>
 
+      {Object.entries(tripGroups).map(([groupLabel, groupTrips], index) => {
+        // Group by Date and Location within this Label
+        const groupedSummary = groupTrips.reduce((acc, t) => {
+          const key = `${format(new Date(t.tanggal_muat), 'yyyy-MM-dd')}|${format(new Date(t.tanggal_bongkar), 'yyyy-MM-dd')}|${t.proyek_lokasi_id}`;
+          if (!acc[key]) acc[key] = [];
+          acc[key].push(t);
+          return acc;
+        }, {} as Record<string, Trip[]>);
+
+        let noSummary = 1;
+        let lastDateCbm: string | null = null;
+        const totalVolumeGroup = groupTrips.reduce((s, t) => s + t.volume, 0);
+        const totalKotorGroup = groupTrips.reduce((s, t) => s + (t.volume * t.harga_trip), 0);
+        const totalPotonganGroup = groupTrips.reduce((s, t) => s + (t.potongan_material_invoice || 0), 0);
+        const totalBersihGroup = totalKotorGroup - totalPotonganGroup;
+
+        return (
+          <div key={groupLabel} className="mb-6">
+            <h3 className="font-bold mb-2">TABEL {index + 1}: {groupLabel}</h3>
+            <table className="main-table w-full">
+              <thead className="bg-[#00B0F0] text-black">
+                <tr>
+                  <th className="w-[5%]">NO</th>
+                  <th className="w-[20%]">TGL MUAT/BKR</th>
+                  <th className="w-[15%]">STA / LOKASI</th>
+                  <th className="w-[10%]">MATERIAL</th>
+                  <th className="w-[10%]">RITASE</th>
+                  <th className="w-[10%]">VOL (M3)</th>
+                  <th className="w-[15%]">Harga (Rp)</th>
+                  <th className="w-[15%]">Nilai PO (Rp)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(groupedSummary).map(([key, items]) => {
+                  const first = items[0];
+                  const currentDateCombo = key;
+
+                  let displayDate = null;
+                  if (currentDateCombo !== lastDateCbm) {
+                    displayDate = (
+                      <>
+                        {format(new Date(first.tanggal_muat), 'EEEE, dd MMM yyyy', { locale: id })}<br />
+                        {format(new Date(first.tanggal_bongkar), 'EEEE, dd MMM yyyy', { locale: id })}
+                      </>
+                    );
+                  }
+
+                  const borderTop = (currentDateCombo !== lastDateCbm && noSummary > 1) ? 'border-t-2 border-black' : '';
+                  lastDateCbm = currentDateCombo;
+
+                  const totalVol = items.reduce((sum, t) => sum + t.volume, 0);
+                  const totalHarga = totalVol * first.harga_trip;
+
+                  return (
+                    <tr key={key}>
+                      <td className={`text-center ${borderTop}`}>{noSummary++}</td>
+                      <td className={`text-center ${borderTop}`}>{displayDate}</td>
+                      <td className={`text-center ${borderTop}`}>{getLokasiName(first.proyek_lokasi_id)}</td>
+                      <td className={`text-center ${borderTop}`}>{groupLabel}</td>
+                      <td className={`text-center ${borderTop}`}>{items.length} Rit</td>
+                      <td className={`text-right ${borderTop}`}>{totalVol.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className={`text-right ${borderTop}`}>Rp {first.harga_trip.toLocaleString('id-ID')}</td>
+                      <td className={`text-right ${borderTop}`}>Rp {totalHarga.toLocaleString('id-ID')}</td>
+                    </tr>
+                  );
+                })}
+                <tr className="font-bold bg-[#f0f0f0]">
+                  <td colSpan={4} className="text-center">TOTAL {groupLabel} (KOTOR)</td>
+                  <td className="text-center">{groupTrips.length} Rit</td>
+                  <td className="text-right">{totalVolumeGroup.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td></td>
+                  <td className="text-right">Rp {totalKotorGroup.toLocaleString('id-ID')}</td>
+                </tr>
+                {totalPotonganGroup > 0 && (
+                  <>
+                    <tr className="font-bold text-red-600">
+                      <td colSpan={7} className="text-right">POTONGAN MATERIAL ({groupLabel})</td>
+                      <td className="text-right">- Rp {totalPotonganGroup.toLocaleString('id-ID')}</td>
+                    </tr>
+                    <tr className="font-bold bg-[#f0f0f0]">
+                      <td colSpan={7} className="text-right">TOTAL {groupLabel} (BERSIH)</td>
+                      <td className="text-right">Rp {totalBersihGroup.toLocaleString('id-ID')}</td>
+                    </tr>
+                  </>
+                )}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+
       <table className="main-table w-full mb-4">
-        <thead className="bg-[#00B0F0] text-black">
-          <tr>
-            <th className="w-[5%]">NO</th>
-            <th className="w-[20%]">TGL MUAT/BKR</th>
-            <th className="w-[15%]">STA / LOKASI</th>
-            <th className="w-[10%]">MATERIAL</th>
-            <th className="w-[10%]">RITASE</th>
-            <th className="w-[10%]">VOL (M3)</th>
-            <th className="w-[15%]">Harga (Rp)</th>
-            <th className="w-[15%]">Nilai PO (Rp)</th>
-          </tr>
-        </thead>
         <tbody>
-          {Object.entries(groupedSummary).map(([key, items]) => {
-            const first = items[0];
-            const currentDateCombo = key;
-
-            let displayDate = null;
-            if (currentDateCombo !== lastDateCbm) {
-              displayDate = (
-                <>
-                  {format(new Date(first.tanggal_muat), 'EEEE, dd MMM yyyy', { locale: id })}<br />
-                  {format(new Date(first.tanggal_bongkar), 'EEEE, dd MMM yyyy', { locale: id })}
-                </>
-              );
-            }
-
-            const borderTop = (currentDateCombo !== lastDateCbm && noSummary > 1) ? 'border-t-2 border-black' : '';
-            lastDateCbm = currentDateCombo;
-
-            const totalVol = items.reduce((sum, t) => sum + t.volume, 0);
-            const totalHarga = totalVol * first.harga_trip;
-
-            return (
-              <tr key={key}>
-                <td className={`text-center ${borderTop}`}>{noSummary++}</td>
-                <td className={`text-center ${borderTop}`}>{displayDate}</td>
-                <td className={`text-center ${borderTop}`}>{getLokasiName(first.proyek_lokasi_id)}</td>
-                <td className={`text-center ${borderTop}`}>CBM</td>
-                <td className={`text-center ${borderTop}`}>{items.length} Rit</td>
-                <td className={`text-right ${borderTop}`}>{totalVol.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td className={`text-right ${borderTop}`}>Rp {first.harga_trip.toLocaleString('id-ID')}</td>
-                <td className={`text-right ${borderTop}`}>Rp {totalHarga.toLocaleString('id-ID')}</td>
-              </tr>
-            );
-          })}
-
-          {invoice.is_potong_material === 1 ? (
-            <>
-              <tr className="font-bold">
-                <td colSpan={4} className="text-center">TOTAL HARGA KOTOR</td>
-                <td className="text-center">{trips.length} Rit</td>
-                <td className="text-right">{invoice.total_kubikasi.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td></td>
-                <td className="text-right">Rp {(invoice.total_harga_kotor).toLocaleString('id-ID')}</td>
-              </tr>
-              <tr className="font-bold text-red-600">
-                <td colSpan={7} className="text-right">POTONGAN MATERIAL</td>
-                <td className="text-right">- Rp {invoice.total_potongan_material.toLocaleString('id-ID')}</td>
-              </tr>
-              <tr className="font-bold bg-[#f0f0f0]">
-                <td colSpan={7} className="text-right">TOTAL NILAI PO (BERSIH)</td>
-                <td className="text-right">Rp {invoice.total_harga_bersih.toLocaleString('id-ID')}</td>
-              </tr>
-            </>
-          ) : (
-            <tr className="font-bold bg-[#f0f0f0]">
-              <td colSpan={4} className="text-center">TOTAL NILAI PO</td>
-              <td className="text-center">{trips.length} Rit</td>
-              <td className="text-right">{invoice.total_kubikasi.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-              <td></td>
-              <td className="text-right">Rp {invoice.total_harga_kotor.toLocaleString('id-ID')}</td>
-            </tr>
-          )}
+          <tr className="font-bold bg-[#f0f0f0] text-[15px]">
+            <td className="text-center w-[70%]">TOTAL NILAI PO KESELURUHAN (BERSIH)</td>
+            <td className="text-right w-[30%]">Rp {invoice.total_harga_bersih.toLocaleString('id-ID')}</td>
+          </tr>
         </tbody>
       </table>
 
@@ -211,7 +239,7 @@ export default function PrintInvoice({
       {Object.entries(groupedByLokasiName).map(([lokasi, tripsLokasi]) => (
         <div key={lokasi} className="page-break-before-always" style={{ pageBreakBefore: 'always', marginTop: '40px' }}>
           <div className="text-center font-bold text-[14px] mb-2 leading-relaxed">
-            REKAP PENGIRIMAN CBM KE {proyek.nama_proyek.toUpperCase()}<br />
+            REKAP PENGIRIMAN (DETAIL LOKASI) KE {proyek.nama_proyek.toUpperCase()}<br />
             PENGIRIM {owner.nama.toUpperCase()}
           </div>
 

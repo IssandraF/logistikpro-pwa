@@ -134,6 +134,34 @@ export default function MasterData() {
     setNamaJs('');
   };
 
+  // Jenis Material
+  const jenisMaterials = useLiveQuery(() => db.jenisMaterials.where('isDeleted').equals(0).toArray());
+  const [namaMaterial, setNamaMaterial] = useState('');
+  const [editingMaterialId, setEditingMaterialId] = useState<number | null>(null);
+
+  const saveMaterial = async () => {
+    if (!namaMaterial) return;
+    if (editingMaterialId) {
+      await db.jenisMaterials.update(editingMaterialId, { nama_material: namaMaterial });
+      toast.success('Jenis Material berhasil diperbarui');
+    } else {
+      await db.jenisMaterials.add({ nama_material: namaMaterial, createdAt: new Date(), isDeleted: 0 });
+      toast.success('Jenis Material berhasil ditambahkan');
+    }
+    cancelEditMaterial();
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const editMaterial = (m: any) => {
+    setEditingMaterialId(m.id);
+    setNamaMaterial(m.nama_material);
+  };
+
+  const cancelEditMaterial = () => {
+    setEditingMaterialId(null);
+    setNamaMaterial('');
+  };
+
   // Rute Tujuan (Proyek Lokasi Pivot)
   const lokasiProyeks = useLiveQuery(() => db.lokasiProyeks.where('isDeleted').equals(0).toArray());
   const proyekLokasis = useLiveQuery(() => db.proyekLokasis.where('isDeleted').equals(0).toArray());
@@ -250,7 +278,8 @@ export default function MasterData() {
           <TabsTrigger value="proyek">Proyek</TabsTrigger>
           <TabsTrigger value="rute-proyek">Rute Tujuan</TabsTrigger>
           <TabsTrigger value="lokasi-kuari">Lokasi Kuari</TabsTrigger>
-          <TabsTrigger value="jenis-jasa">Jenis Jasa</TabsTrigger>
+          <TabsTrigger value="jenis-jasa">Jenis Pengiriman (Jasa)</TabsTrigger>
+          <TabsTrigger value="jenis-material">Jenis Material</TabsTrigger>
         </TabsList>
 
         <TabsContent value="perusahaan">
@@ -465,7 +494,7 @@ export default function MasterData() {
 
         <TabsContent value="jenis-jasa">
           <Card>
-            <CardHeader><CardTitle>Jenis Jasa</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Jenis Pengiriman / Jasa</CardTitle></CardHeader>
             <CardContent>
               <div className="flex gap-4 mb-6">
                 <div className="flex-1 space-y-2">
@@ -486,6 +515,37 @@ export default function MasterData() {
                     <div className="flex gap-2">
                       <Button variant="ghost" size="icon" onClick={() => editJs(j)}><Edit className="w-4 h-4 text-blue-500" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => { if(confirm('Hapus Jenis Jasa?')) db.jenisJasas.update(j.id!, { isDeleted: 1 }) }}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="jenis-material">
+          <Card>
+            <CardHeader><CardTitle>Jenis Material</CardTitle></CardHeader>
+            <CardContent>
+              <div className="flex gap-4 mb-6">
+                <div className="flex-1 space-y-2">
+                  <Label>Nama Material (Misal: CBM, TIMEK)</Label>
+                  <Input value={namaMaterial} onChange={e => setNamaMaterial(e.target.value.toUpperCase())} className="uppercase" />
+                </div>
+                <div className="flex items-end gap-2">
+                  <Button onClick={saveMaterial}>
+                    {editingMaterialId ? <><Save className="w-4 h-4 mr-2"/> Simpan</> : <><Plus className="w-4 h-4 mr-2"/> Tambah</>}
+                  </Button>
+                  {editingMaterialId && <Button variant="outline" size="icon" onClick={cancelEditMaterial}><X className="w-4 h-4"/></Button>}
+                </div>
+              </div>
+              <ul className="space-y-2">
+                {jenisMaterials?.map(m => (
+                  <li key={m.id} className="flex items-center justify-between p-3 border rounded-md">
+                    <span className="font-semibold">{m.nama_material}</span>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => editMaterial(m)}><Edit className="w-4 h-4 text-blue-500" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => { if(confirm('Hapus Jenis Material?')) db.jenisMaterials.update(m.id!, { isDeleted: 1 }) }}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                     </div>
                   </li>
                 ))}

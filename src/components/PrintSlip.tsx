@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { generateTerbilangText } from "@/lib/print-utils";
-import type { SlipPembayaran, Trip, GrupMobil, ProyekLokasi, LokasiProyek, LokasiKuari } from "@/lib/db";
+import type { SlipPembayaran, Trip, GrupMobil, ProyekLokasi, LokasiProyek } from "@/lib/db";
 
 interface PrintSlipProps {
   slip: SlipPembayaran;
