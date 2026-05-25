@@ -179,7 +179,7 @@ export default function PrintInvoice({
                   );
                 })}
                 <tr className="font-bold bg-[#f0f0f0]">
-                  <td colSpan={4} className="text-center">TOTAL {groupLabel} (KOTOR)</td>
+                  <td colSpan={4} className="text-center">TOTAL {groupLabel}</td>
                   <td className="text-center">{groupTrips.length} Rit</td>
                   <td className="text-right">{totalVolumeGroup.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td></td>
@@ -192,7 +192,7 @@ export default function PrintInvoice({
                       <td className="text-right">- Rp {totalPotonganGroup.toLocaleString('id-ID')}</td>
                     </tr>
                     <tr className="font-bold bg-[#f0f0f0]">
-                      <td colSpan={7} className="text-right">TOTAL {groupLabel} (BERSIH)</td>
+                      <td colSpan={7} className="text-right">TOTAL {groupLabel} </td>
                       <td className="text-right">Rp {totalBersihGroup.toLocaleString('id-ID')}</td>
                     </tr>
                   </>
@@ -206,7 +206,7 @@ export default function PrintInvoice({
       <table className="main-table w-full mb-4">
         <tbody>
           <tr className="font-bold bg-[#f0f0f0] text-[15px]">
-            <td className="text-center w-[70%]">TOTAL NILAI PO KESELURUHAN (BERSIH)</td>
+            <td className="text-center w-[70%]">TOTAL NILAI PO KESELURUHAN</td>
             <td className="text-right w-[30%]">Rp {invoice.total_harga_bersih.toLocaleString('id-ID')}</td>
           </tr>
         </tbody>
@@ -239,7 +239,7 @@ export default function PrintInvoice({
       {Object.entries(groupedByLokasiName).map(([lokasi, tripsLokasi]) => (
         <div key={lokasi} className="page-break-before-always" style={{ pageBreakBefore: 'always', marginTop: '40px' }}>
           <div className="text-center font-bold text-[14px] mb-2 leading-relaxed">
-            REKAP PENGIRIMAN (DETAIL LOKASI) KE {proyek.nama_proyek.toUpperCase()}<br />
+            REKAP PENGIRIMAN KE {proyek.nama_proyek.toUpperCase()}<br />
             PENGIRIM {owner.nama.toUpperCase()}
           </div>
 
