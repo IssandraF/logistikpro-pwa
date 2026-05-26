@@ -38,11 +38,23 @@ export default function PrintInvoice({
   // Sort Summary Grouped by Muat|Bongkar|Lokasi
   const summaryTrips = [...trips].sort((a, b) => new Date(a.tanggal_bongkar).getTime() - new Date(b.tanggal_bongkar).getTime());
 
-  // Split trips by Group (Material or Jasa)
+  // Split trips by Group (Material and Jasa)
   const tripGroups = summaryTrips.reduce((acc, t) => {
     const material = t.jenis_material_id ? jenisMaterials.find(m => m.id === t.jenis_material_id)?.nama_material : null;
     const jasa = t.jenis_jasa_id ? jenisJasas.find(j => j.id === t.jenis_jasa_id)?.nama_js : null;
-    const label = (material || jasa || 'CBM').toUpperCase(); // Fallback to CBM if empty
+    
+    let label = '';
+    if (material && jasa) {
+      label = `${material} - ${jasa}`;
+    } else if (material) {
+      label = material;
+    } else if (jasa) {
+      label = `CBM - ${jasa}`;
+    } else {
+      label = 'CBM';
+    }
+    label = label.toUpperCase();
+
     if (!acc[label]) acc[label] = [];
     acc[label].push(t);
     return acc;
@@ -132,7 +144,7 @@ export default function PrintInvoice({
           <div key={groupLabel} className="mb-6">
             <h3 className="font-bold mb-2">TABEL {index + 1}: {groupLabel}</h3>
             <table className="main-table w-full">
-              <thead className="bg-[#00B0F0] text-black">
+              <thead className={totalPotonganGroup > 0 ? "bg-amber-400 text-black" : "bg-[#00B0F0] text-black"}>
                 <tr>
                   <th className="w-[5%]">NO</th>
                   <th className="w-[20%]">TGL MUAT/BKR</th>
