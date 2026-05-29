@@ -11,6 +11,7 @@ import Finance from './pages/Finance';
 import Settings from './pages/Settings';
 import Landing from './pages/Landing';
 import Onboarding from './pages/Onboarding';
+import MarginAnalysis from './pages/MarginAnalysis';
 
 const router = createBrowserRouter([
   {
@@ -26,6 +27,7 @@ const router = createBrowserRouter([
       { path: 'trips', element: <Trips /> },
       { path: 'invoices', element: <Invoices /> },
       { path: 'slips', element: <Slips /> },
+      { path: 'margin', element: <MarginAnalysis /> },
       { path: 'finance', element: <Finance /> },
       { path: 'settings', element: <Settings /> },
       { path: 'onboarding', element: <Onboarding /> },

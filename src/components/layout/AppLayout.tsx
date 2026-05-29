@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { Home, Database, Truck, FileText, Banknote, Settings, CreditCard, User } from 'lucide-react';
+import { Home, Database, Truck, FileText, Banknote, Settings, CreditCard, User, LineChart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Toaster } from 'sonner';
 
@@ -12,6 +12,7 @@ const navItems = [
   { icon: Truck, label: 'Trip', path: '/app/trips' },
   { icon: FileText, label: 'Invoice', path: '/app/invoices' },
   { icon: CreditCard, label: 'Slip Bayar', path: '/app/slips' },
+  { icon: LineChart, label: 'Laba Rugi', path: '/app/margin' },
   { icon: Banknote, label: 'Keuangan', path: '/app/finance' },
   { icon: Settings, label: 'Pengaturan', path: '/app/settings' },
 ];

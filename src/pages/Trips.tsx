@@ -118,7 +118,7 @@ export default function Trips() {
   const [filterStart, setFilterStart] = useState('');
   const [filterEnd, setFilterEnd] = useState('');
   const [filterProyekId, setFilterProyekId] = useState('');
-  const [filterGrupId, setFilterGrupId] = useState('');
+  const [filterGrupIds, setFilterGrupIds] = useState<number[]>([]);
   const [showRingkasanKuari, setShowRingkasanKuari] = useState(true);
   const [hargaMaterialMap, setHargaMaterialMap] = useState<Record<number, number>>({});
 
@@ -144,12 +144,12 @@ export default function Trips() {
       result = result.filter(t => allowedProyekLokasiIds.includes(t.proyek_lokasi_id));
     }
     
-    if (filterGrupId && filterGrupId !== 'all') {
-      result = result.filter(t => t.grup_mobil_id === Number(filterGrupId));
+    if (filterGrupIds.length > 0) {
+      result = result.filter(t => filterGrupIds.includes(t.grup_mobil_id));
     }
     
     return result;
-  }, [trips, filterStart, filterEnd, filterProyekId, filterGrupId, proyekLokasis]);
+  }, [trips, filterStart, filterEnd, filterProyekId, filterGrupIds, proyekLokasis]);
 
   // Unique Kuaris in Filtered Trips
   const uniqueKuaris = useMemo(() => {
@@ -430,7 +430,7 @@ export default function Trips() {
     setFilterStart('');
     setFilterEnd('');
     setFilterProyekId('all');
-    setFilterGrupId('all');
+    setFilterGrupIds([]);
     setShowRingkasanKuari(true);
     setHargaMaterialMap({});
     setPrintModalOpen(true);
@@ -905,14 +905,26 @@ export default function Trips() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Pilih Grup (Opsional)</Label>
-                <Select value={filterGrupId} onValueChange={setFilterGrupId}>
-                  <SelectTrigger><SelectValue placeholder="Semua Grup" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Grup</SelectItem>
-                    {grupMobils?.map(g => <SelectItem key={g.id} value={g.id!.toString()}>{g.nama_grup}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label>Pilih Grup (Opsional - Multi)</Label>
+                <div className="max-h-32 overflow-y-auto border rounded-md p-2 space-y-2 bg-background flex flex-col">
+                  {grupMobils?.map(g => (
+                    <label key={g.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="accent-primary cursor-pointer w-4 h-4"
+                        checked={filterGrupIds.includes(g.id!)}
+                        onChange={(e) => {
+                          if (e.target.checked) setFilterGrupIds([...filterGrupIds, g.id!]);
+                          else setFilterGrupIds(filterGrupIds.filter(id => id !== g.id!));
+                        }}
+                      />
+                      {g.nama_grup}
+                    </label>
+                  ))}
+                  {(!grupMobils || grupMobils.length === 0) && (
+                    <p className="text-xs text-muted-foreground">Tidak ada grup</p>
+                  )}
+                </div>
               </div>
             </div>
             
