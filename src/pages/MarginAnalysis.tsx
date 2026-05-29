@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -324,7 +324,7 @@ export default function MarginAnalysis() {
                               grandPotongan += subPotongan;
 
                               return (
-                                <React.Fragment key={key}>
+                                <Fragment key={key}>
                                   <tr className="bg-muted/20 border-b">
                                     <td colSpan={includePotonganMaterial ? 8 : 7} className="p-3 font-semibold text-primary">
                                       Tgl Bongkar: {format(new Date(tglStr), 'dd/MM/yyyy')} | Lokasi: {getLokasiName(plId)}
@@ -341,7 +341,7 @@ export default function MarginAnalysis() {
                                       {formatRp(subTagihan - subBiaya)}
                                     </td>
                                   </tr>
-                                </React.Fragment>
+                                </Fragment>
                               );
                             })}
                             
@@ -457,7 +457,7 @@ export default function MarginAnalysis() {
                       grandPotongan += subPotongan;
 
                       return (
-                        <React.Fragment key={key}>
+                        <Fragment key={key}>
                           <tr>
                             <td colSpan={includePotonganMaterial ? 7 : 6} className="py-1 pt-2 font-semibold italic text-xs text-gray-600">
                               Tgl: {format(new Date(tglStr), 'dd/MM/yy')} | Lokasi: {getLokasiName(plId)}
@@ -472,7 +472,7 @@ export default function MarginAnalysis() {
                             <td className="py-1 text-right text-xs">{formatRp(subBiaya)}</td>
                             <td className="py-1 text-right text-xs">{formatRp(subTagihan - subBiaya)}</td>
                           </tr>
-                        </React.Fragment>
+                        </Fragment>
                       );
                     })}
                     <tr className="font-bold border-t-2 bg-gray-50">
