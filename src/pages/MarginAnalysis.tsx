@@ -4,7 +4,6 @@ import { db } from '@/lib/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import { LineChart, DollarSign, ArrowUpRight, ArrowDownRight, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -143,10 +142,12 @@ export default function MarginAnalysis() {
               <div className="max-h-32 overflow-y-auto border rounded-md p-2 space-y-2 bg-muted/20">
                 {proyeks?.map(p => (
                   <div key={p.id} className="flex items-center space-x-2">
-                    <Checkbox 
+                    <input 
+                      type="checkbox"
                       id={`p-${p.id}`} 
                       checked={selectedProyekIds.includes(p.id!)}
-                      onCheckedChange={() => toggleProyek(p.id!)}
+                      onChange={() => toggleProyek(p.id!)}
+                      className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
                     />
                     <label htmlFor={`p-${p.id}`} className="text-sm font-medium leading-none cursor-pointer">
                       {p.nama_proyek}
@@ -162,10 +163,12 @@ export default function MarginAnalysis() {
               <div className="max-h-32 overflow-y-auto border rounded-md p-2 space-y-2 bg-muted/20">
                 {grupMobils?.map(g => (
                   <div key={g.id} className="flex items-center space-x-2">
-                    <Checkbox 
+                    <input 
+                      type="checkbox"
                       id={`g-${g.id}`} 
                       checked={selectedGrupIds.includes(g.id!)}
-                      onCheckedChange={() => toggleGrup(g.id!)}
+                      onChange={() => toggleGrup(g.id!)}
+                      className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
                     />
                     <label htmlFor={`g-${g.id}`} className="text-sm font-medium leading-none cursor-pointer">
                       {g.nama_grup}
@@ -176,10 +179,12 @@ export default function MarginAnalysis() {
             </div>
 
             <div className="flex items-center space-x-2 pt-2 border-t">
-              <Checkbox 
+              <input 
+                type="checkbox"
                 id="inc-material" 
                 checked={includePotonganMaterial}
-                onCheckedChange={(c) => setIncludePotonganMaterial(!!c)}
+                onChange={(e) => setIncludePotonganMaterial(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
               />
               <label htmlFor="inc-material" className="text-sm font-medium leading-none cursor-pointer">
                 Sertakan Potongan Material (Mengurangi Biaya)
