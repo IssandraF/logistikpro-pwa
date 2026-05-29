@@ -34,6 +34,13 @@ export default function MarginAnalysis() {
     return proyeks?.find(p => p.id === proyekId)?.nama_proyek || 'Unknown Proyek';
   };
 
+  const getLokasiName = (plId: number) => {
+    const pl = proyekLokasis?.find(x => x.id === plId);
+    if (!pl) return '-';
+    const loc = lokasiProyeks?.find(x => x.id === pl.lokasi_proyek_id);
+    return loc ? loc.nama_lokasi : '-';
+  };
+
   const getGrupName = (grupId: number) => {
     return grupMobils?.find(g => g.id === grupId)?.nama_grup || 'Unknown Grup';
   };
@@ -41,12 +48,11 @@ export default function MarginAnalysis() {
   // Filter & Kalkulasi Data
   const { filteredData, summary } = useMemo(() => {
     if (!completedTrips || !proyeks || !grupMobils || !proyekLokasis) {
-      return { filteredData: {}, summary: { volume: 0, tagihan: 0, pembayaran: 0, margin: 0 } };
+      return { filteredData: {}, summary: { volume: 0, tagihan: 0, pembayaran: 0, potonganMat: 0, margin: 0 } };
     }
 
     // 1. Filter Trips
     const filtered = completedTrips.filter(t => {
-      // Date Filter
       const tripDate = new Date(t.tanggal_bongkar);
       tripDate.setHours(0, 0, 0, 0);
       if (startDate) {
@@ -60,26 +66,28 @@ export default function MarginAnalysis() {
         if (tripDate > end) return false;
       }
 
-      // Proyek Filter
       const pId = getProyekIdByLokasi(t.proyek_lokasi_id);
       if (selectedProyekIds.length > 0 && !selectedProyekIds.includes(pId)) return false;
-
-      // Grup Filter
       if (selectedGrupIds.length > 0 && !selectedGrupIds.includes(t.grup_mobil_id)) return false;
 
       return true;
     });
 
-    // 2. Group by Proyek
-    const grouped: Record<number, typeof filtered> = {};
+    // 2. Group by Proyek -> Date & Lokasi
+    const grouped: Record<number, Record<string, typeof filtered>> = {};
     let sumVol = 0;
     let sumTagihan = 0;
     let sumPembayaran = 0;
+    let sumPotonganMaterial = 0;
 
     filtered.forEach(t => {
       const pId = getProyekIdByLokasi(t.proyek_lokasi_id);
-      if (!grouped[pId]) grouped[pId] = [];
-      grouped[pId].push(t);
+      const tglBongkar = format(new Date(t.tanggal_bongkar), 'yyyy-MM-dd');
+      const groupKey = `${tglBongkar}|${t.proyek_lokasi_id}`;
+
+      if (!grouped[pId]) grouped[pId] = {};
+      if (!grouped[pId][groupKey]) grouped[pId][groupKey] = [];
+      grouped[pId][groupKey].push(t);
 
       // Kalkulasi Global
       sumVol += t.volume;
@@ -88,6 +96,7 @@ export default function MarginAnalysis() {
       const costUtuh = t.volume * (t.harga_bayar || t.harga_trip);
       const potongan = t.potongan_trip || 0;
       
+      sumPotonganMaterial += potongan;
       const realCost = includePotonganMaterial ? (costUtuh - potongan) : costUtuh;
       sumPembayaran += realCost;
     });
@@ -96,7 +105,7 @@ export default function MarginAnalysis() {
 
     return { 
       filteredData: grouped, 
-      summary: { volume: sumVol, tagihan: sumTagihan, pembayaran: sumPembayaran, margin: sumMargin } 
+      summary: { volume: sumVol, tagihan: sumTagihan, pembayaran: sumPembayaran, potonganMat: sumPotonganMaterial, margin: sumMargin } 
     };
   }, [completedTrips, proyeks, grupMobils, proyekLokasis, startDate, endDate, selectedProyekIds, selectedGrupIds, includePotonganMaterial]);
 
@@ -236,52 +245,24 @@ export default function MarginAnalysis() {
             {Object.keys(filteredData).length === 0 ? (
               <Card>
                 <CardContent className="p-8 text-center text-muted-foreground">
-                  Belum ada data trip yang memenuhi kriteria filter (Atau belum ada trip yang sudah di-invoice & dibayar).
+                  Belum ada data trip yang memenuhi kriteria filter.
                 </CardContent>
               </Card>
             ) : (
-              Object.entries(filteredData).map(([pIdStr, trips]) => {
+              Object.entries(filteredData).map(([pIdStr, dateGroups]) => {
                 const pId = Number(pIdStr);
                 
-                // Subtotal for Project
-                let subTagihan = 0;
-                let subBiaya = 0;
-                let subVol = 0;
-
-                const rows = trips.map(t => {
-                  const tagihan = t.total_harga;
-                  const costUtuh = t.volume * (t.harga_bayar || t.harga_trip);
-                  const potongan = t.potongan_trip || 0;
-                  const biaya = includePotonganMaterial ? (costUtuh - potongan) : costUtuh;
-                  const margin = tagihan - biaya;
-                  
-                  subTagihan += tagihan;
-                  subBiaya += biaya;
-                  subVol += t.volume;
-
-                  return (
-                    <tr key={t.id} className="border-b hover:bg-muted/30 text-sm">
-                      <td className="p-2">{format(new Date(t.tanggal_bongkar), 'dd/MM/yyyy')}</td>
-                      <td className="p-2 font-medium">{t.plat_nomor}</td>
-                      <td className="p-2">{getGrupName(t.grup_mobil_id)}</td>
-                      <td className="p-2 text-right">{t.volume.toLocaleString('id-ID')} m³</td>
-                      <td className="p-2 text-right text-green-600">{formatRp(tagihan)}</td>
-                      <td className="p-2 text-right text-red-600">{formatRp(biaya)}</td>
-                      <td className={`p-2 text-right font-bold ${margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatRp(margin)}
-                      </td>
-                    </tr>
-                  );
-                });
-
-                const subMargin = subTagihan - subBiaya;
+                // Grand Total for Project
+                let grandTagihan = 0;
+                let grandBiaya = 0;
+                let grandVol = 0;
+                let grandPotongan = 0;
 
                 return (
                   <Card key={pId} className="overflow-hidden break-inside-avoid shadow-md">
                     <CardHeader className="bg-muted/50 p-4 border-b">
                       <CardTitle className="text-lg flex justify-between items-center">
                         <span>Proyek: {getProyekName(pId)}</span>
-                        <span className="text-sm font-normal text-muted-foreground">{trips.length} Trip Terkait</span>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -289,25 +270,90 @@ export default function MarginAnalysis() {
                         <table className="w-full text-left border-collapse">
                           <thead className="bg-muted/30 border-b text-xs uppercase text-muted-foreground">
                             <tr>
-                              <th className="p-3">Tanggal</th>
+                              <th className="p-3 w-10">No</th>
                               <th className="p-3">Plat Nomor</th>
                               <th className="p-3">Grup Truk</th>
                               <th className="p-3 text-right">Volume</th>
+                              {includePotonganMaterial && <th className="p-3 text-right">Ptg Material</th>}
                               <th className="p-3 text-right">Tagihan (Inv)</th>
                               <th className="p-3 text-right">Biaya (Slip)</th>
                               <th className="p-3 text-right">Margin</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {rows}
-                            {/* Subtotal Row */}
-                            <tr className="bg-primary/5 font-bold text-sm border-t">
-                              <td colSpan={3} className="p-3 text-right">SUBTOTAL {getProyekName(pId)} :</td>
-                              <td className="p-3 text-right">{subVol.toLocaleString('id-ID')} m³</td>
-                              <td className="p-3 text-right text-green-700">{formatRp(subTagihan)}</td>
-                              <td className="p-3 text-right text-red-700">{formatRp(subBiaya)}</td>
-                              <td className={`p-3 text-right ${subMargin >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                {formatRp(subMargin)}
+                            {Object.entries(dateGroups).map(([key, trips]) => {
+                              const [tglStr, plIdStr] = key.split('|');
+                              const plId = Number(plIdStr);
+                              
+                              let subTagihan = 0;
+                              let subBiaya = 0;
+                              let subVol = 0;
+                              let subPotongan = 0;
+
+                              const rows = trips.map((t, idx) => {
+                                const tagihan = t.total_harga;
+                                const costUtuh = t.volume * (t.harga_bayar || t.harga_trip);
+                                const potongan = t.potongan_trip || 0;
+                                const biaya = includePotonganMaterial ? (costUtuh - potongan) : costUtuh;
+                                const margin = tagihan - biaya;
+                                
+                                subTagihan += tagihan;
+                                subBiaya += biaya;
+                                subVol += t.volume;
+                                subPotongan += potongan;
+
+                                return (
+                                  <tr key={t.id} className="border-b hover:bg-muted/30 text-sm">
+                                    <td className="p-3">{idx + 1}</td>
+                                    <td className="p-3 font-medium">{t.plat_nomor}</td>
+                                    <td className="p-3">{getGrupName(t.grup_mobil_id)}</td>
+                                    <td className="p-3 text-right">{t.volume.toLocaleString('id-ID')} m³</td>
+                                    {includePotonganMaterial && <td className="p-3 text-right text-red-500">{formatRp(potongan)}</td>}
+                                    <td className="p-3 text-right text-green-600">{formatRp(tagihan)}</td>
+                                    <td className="p-3 text-right text-red-600">{formatRp(biaya)}</td>
+                                    <td className={`p-3 text-right font-bold ${margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      {formatRp(margin)}
+                                    </td>
+                                  </tr>
+                                );
+                              });
+
+                              grandTagihan += subTagihan;
+                              grandBiaya += subBiaya;
+                              grandVol += subVol;
+                              grandPotongan += subPotongan;
+
+                              return (
+                                <React.Fragment key={key}>
+                                  <tr className="bg-muted/20 border-b">
+                                    <td colSpan={includePotonganMaterial ? 8 : 7} className="p-3 font-semibold text-primary">
+                                      Tgl Bongkar: {format(new Date(tglStr), 'dd/MM/yyyy')} | Lokasi: {getLokasiName(plId)}
+                                    </td>
+                                  </tr>
+                                  {rows}
+                                  <tr className="bg-primary/5 font-semibold text-sm border-t border-b-2">
+                                    <td colSpan={3} className="p-3 text-right">Subtotal {format(new Date(tglStr), 'dd/MM')}:</td>
+                                    <td className="p-3 text-right">{subVol.toLocaleString('id-ID')} m³</td>
+                                    {includePotonganMaterial && <td className="p-3 text-right text-red-600">{formatRp(subPotongan)}</td>}
+                                    <td className="p-3 text-right text-green-700">{formatRp(subTagihan)}</td>
+                                    <td className="p-3 text-right text-red-700">{formatRp(subBiaya)}</td>
+                                    <td className={`p-3 text-right ${subTagihan - subBiaya >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                                      {formatRp(subTagihan - subBiaya)}
+                                    </td>
+                                  </tr>
+                                </React.Fragment>
+                              );
+                            })}
+                            
+                            {/* Grand Total Proyek */}
+                            <tr className="bg-primary/10 font-bold text-sm border-t-2">
+                              <td colSpan={3} className="p-3 text-right">GRAND TOTAL PROYEK:</td>
+                              <td className="p-3 text-right">{grandVol.toLocaleString('id-ID')} m³</td>
+                              {includePotonganMaterial && <td className="p-3 text-right text-red-700">{formatRp(grandPotongan)}</td>}
+                              <td className="p-3 text-right text-green-700">{formatRp(grandTagihan)}</td>
+                              <td className="p-3 text-right text-red-700">{formatRp(grandBiaya)}</td>
+                              <td className={`p-3 text-right ${grandTagihan - grandBiaya >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                                {formatRp(grandTagihan - grandBiaya)}
                               </td>
                             </tr>
                           </tbody>
@@ -322,7 +368,7 @@ export default function MarginAnalysis() {
         </div>
       </div>
       
-      {/* Print-only View (Simplified) */}
+      {/* Print-only View */}
       <div className="hidden print:block space-y-6">
          <div className="text-center mb-6">
             <h1 className="text-2xl font-bold">Laporan Analisis Margin Trip</h1>
@@ -349,54 +395,93 @@ export default function MarginAnalysis() {
             </div>
          </div>
 
-         {Object.entries(filteredData).map(([pIdStr, trips]) => {
+         {Object.entries(filteredData).map(([pIdStr, dateGroups]) => {
             const pId = Number(pIdStr);
-            let subTagihan = 0;
-            let subBiaya = 0;
-            let subVol = 0;
+            let grandTagihan = 0;
+            let grandBiaya = 0;
+            let grandVol = 0;
+            let grandPotongan = 0;
+
             return (
               <div key={pId} className="mb-6 break-inside-avoid">
                 <h3 className="font-bold text-lg mb-2 bg-gray-100 p-2">Proyek: {getProyekName(pId)}</h3>
                 <table className="w-full text-sm border-collapse">
                   <thead>
-                    <tr className="border-b">
-                      <th className="py-2 text-left">Tanggal</th>
+                    <tr className="border-b bg-gray-50">
                       <th className="py-2 text-left">Plat</th>
                       <th className="py-2 text-left">Grup</th>
-                      <th className="py-2 text-right">Vol (m³)</th>
+                      <th className="py-2 text-right">Vol</th>
+                      {includePotonganMaterial && <th className="py-2 text-right">Potongan</th>}
                       <th className="py-2 text-right">Tagihan</th>
                       <th className="py-2 text-right">Biaya</th>
                       <th className="py-2 text-right">Margin</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {trips.map(t => {
-                      const tagihan = t.total_harga;
-                      const costUtuh = t.volume * (t.harga_bayar || t.harga_trip);
-                      const potongan = t.potongan_trip || 0;
-                      const biaya = includePotonganMaterial ? (costUtuh - potongan) : costUtuh;
-                      const margin = tagihan - biaya;
-                      subTagihan += tagihan;
-                      subBiaya += biaya;
-                      subVol += t.volume;
+                    {Object.entries(dateGroups).map(([key, trips]) => {
+                      const [tglStr, plIdStr] = key.split('|');
+                      const plId = Number(plIdStr);
+                      
+                      let subTagihan = 0;
+                      let subBiaya = 0;
+                      let subVol = 0;
+                      let subPotongan = 0;
+                      
+                      const rows = trips.map(t => {
+                        const tagihan = t.total_harga;
+                        const costUtuh = t.volume * (t.harga_bayar || t.harga_trip);
+                        const potongan = t.potongan_trip || 0;
+                        const biaya = includePotonganMaterial ? (costUtuh - potongan) : costUtuh;
+                        const margin = tagihan - biaya;
+                        subTagihan += tagihan;
+                        subBiaya += biaya;
+                        subVol += t.volume;
+                        subPotongan += potongan;
+                        
+                        return (
+                          <tr key={t.id} className="border-b">
+                            <td className="py-1">{t.plat_nomor}</td>
+                            <td className="py-1">{getGrupName(t.grup_mobil_id)}</td>
+                            <td className="py-1 text-right">{t.volume}</td>
+                            {includePotonganMaterial && <td className="py-1 text-right text-red-600">{formatRp(potongan)}</td>}
+                            <td className="py-1 text-right">{formatRp(tagihan)}</td>
+                            <td className="py-1 text-right">{formatRp(biaya)}</td>
+                            <td className="py-1 text-right">{formatRp(margin)}</td>
+                          </tr>
+                        );
+                      });
+
+                      grandTagihan += subTagihan;
+                      grandBiaya += subBiaya;
+                      grandVol += subVol;
+                      grandPotongan += subPotongan;
+
                       return (
-                        <tr key={t.id} className="border-b">
-                          <td className="py-1">{format(new Date(t.tanggal_bongkar), 'dd/MM/yy')}</td>
-                          <td className="py-1">{t.plat_nomor}</td>
-                          <td className="py-1">{getGrupName(t.grup_mobil_id)}</td>
-                          <td className="py-1 text-right">{t.volume}</td>
-                          <td className="py-1 text-right">{formatRp(tagihan)}</td>
-                          <td className="py-1 text-right">{formatRp(biaya)}</td>
-                          <td className="py-1 text-right">{formatRp(margin)}</td>
-                        </tr>
+                        <React.Fragment key={key}>
+                          <tr>
+                            <td colSpan={includePotonganMaterial ? 7 : 6} className="py-1 pt-2 font-semibold italic text-xs text-gray-600">
+                              Tgl: {format(new Date(tglStr), 'dd/MM/yy')} | Lokasi: {getLokasiName(plId)}
+                            </td>
+                          </tr>
+                          {rows}
+                          <tr className="font-semibold border-b-2">
+                            <td colSpan={2} className="py-1 text-right text-xs">Subtotal:</td>
+                            <td className="py-1 text-right text-xs">{subVol}</td>
+                            {includePotonganMaterial && <td className="py-1 text-right text-xs">{formatRp(subPotongan)}</td>}
+                            <td className="py-1 text-right text-xs">{formatRp(subTagihan)}</td>
+                            <td className="py-1 text-right text-xs">{formatRp(subBiaya)}</td>
+                            <td className="py-1 text-right text-xs">{formatRp(subTagihan - subBiaya)}</td>
+                          </tr>
+                        </React.Fragment>
                       );
                     })}
-                    <tr className="font-bold border-t">
-                      <td colSpan={3} className="py-2 text-right">SUBTOTAL:</td>
-                      <td className="py-2 text-right">{subVol}</td>
-                      <td className="py-2 text-right">{formatRp(subTagihan)}</td>
-                      <td className="py-2 text-right">{formatRp(subBiaya)}</td>
-                      <td className="py-2 text-right">{formatRp(subTagihan - subBiaya)}</td>
+                    <tr className="font-bold border-t-2 bg-gray-50">
+                      <td colSpan={2} className="py-2 text-right">GRAND TOTAL:</td>
+                      <td className="py-2 text-right">{grandVol}</td>
+                      {includePotonganMaterial && <td className="py-2 text-right text-red-600">{formatRp(grandPotongan)}</td>}
+                      <td className="py-2 text-right">{formatRp(grandTagihan)}</td>
+                      <td className="py-2 text-right">{formatRp(grandBiaya)}</td>
+                      <td className="py-2 text-right">{formatRp(grandTagihan - grandBiaya)}</td>
                     </tr>
                   </tbody>
                 </table>
