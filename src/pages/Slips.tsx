@@ -34,6 +34,15 @@ export default function Slips() {
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   
+  // Filter for Data Slips list
+  const [filterDataGrupId, setFilterDataGrupId] = useState('all');
+  
+  const filteredSlipsData = useMemo(() => {
+    if (!slips) return [];
+    if (filterDataGrupId === 'all') return slips;
+    return slips.filter(s => s.grup_mobil_id === Number(filterDataGrupId));
+  }, [slips, filterDataGrupId]);
+  
   // Print State
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [slipToPrint, setSlipToPrint] = useState<any>(null);
@@ -379,7 +388,20 @@ export default function Slips() {
 
         <TabsContent value="data">
           <Card>
-            <CardHeader><CardTitle>Daftar Slip</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Daftar Slip</CardTitle>
+              <Select value={filterDataGrupId} onValueChange={setFilterDataGrupId}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Semua Grup" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Grup</SelectItem>
+                  {grupMobils?.map(g => (
+                    <SelectItem key={g.id} value={g.id!.toString()}>{g.nama_grup}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardHeader>
             <CardContent>
               <div className="overflow-x-auto border rounded-lg">
                 <table className="w-full text-sm text-left">
@@ -395,7 +417,7 @@ export default function Slips() {
                     </tr>
                   </thead>
                   <tbody>
-                    {slips?.map(s => (
+                    {filteredSlipsData?.map(s => (
                       <tr key={s.id} className="border-b">
                         <td className="p-3 font-medium">{s.nomor_slip}</td>
                         <td className="p-3">{format(new Date(s.tanggal), 'dd/MM/yyyy')}</td>
@@ -432,7 +454,7 @@ export default function Slips() {
                         </td>
                       </tr>
                     ))}
-                    {slips?.length === 0 && <tr><td colSpan={7} className="p-4 text-center">Belum ada slip pembayaran</td></tr>}
+                    {filteredSlipsData?.length === 0 && <tr><td colSpan={8} className="p-4 text-center">Belum ada slip pembayaran</td></tr>}
                   </tbody>
                 </table>
               </div>
