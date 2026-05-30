@@ -38,27 +38,40 @@ export default function PrintInvoice({
   // Sort Summary Grouped by Muat|Bongkar|Lokasi
   const summaryTrips = [...trips].sort((a, b) => new Date(a.tanggal_bongkar).getTime() - new Date(b.tanggal_bongkar).getTime());
 
-  // Split trips by Group (Material and Jasa)
-  const tripGroups = summaryTrips.reduce((acc, t) => {
-    const material = t.jenis_material_id ? jenisMaterials.find(m => m.id === t.jenis_material_id)?.nama_material : null;
-    const jasa = t.jenis_jasa_id ? jenisJasas.find(j => j.id === t.jenis_jasa_id)?.nama_js : null;
-    
-    let label = '';
-    if (material && jasa) {
-      label = `${material} - ${jasa}`;
-    } else if (material) {
-      label = material;
-    } else if (jasa) {
-      label = `CBM - ${jasa}`;
-    } else {
-      label = 'CBM';
-    }
-    label = label.toUpperCase();
-
-    if (!acc[label]) acc[label] = [];
-    acc[label].push(t);
+  // --- PERBAIKAN: Pembuatan Hash Map untuk performa O(1) ---
+  const materialMap = jenisMaterials.reduce((acc, m) => {
+    if (m.id != null) acc[m.id] = m.nama_material;
     return acc;
-  }, {} as Record<string, Trip[]>);
+  }, {} as Record<number, string>);
+
+  const jasaMap = jenisJasas.reduce((acc, j) => {
+    if (j.id != null) acc[j.id] = j.nama_js;
+    return acc;
+  }, {} as Record<number, string>);
+
+  // --- PERBAIKAN: Split trips by Group (Unique Logic vs UI Label) ---
+  const tripGroups = summaryTrips.reduce((acc, t) => {
+    const material = t.jenis_material_id != null ? materialMap[t.jenis_material_id] : null;
+    
+    // 1. Kunci Unik di belakang layar (kombinasi ID Material & ID Jasa)
+    const idMat = t.jenis_material_id ?? '0';
+    const idJas = t.jenis_jasa_id ?? '0';
+    const uniqueKey = `${idMat}-${idJas}`;
+
+    // 2. Label yang akan muncul di layar (HANYA MATERIAL)
+    const displayLabel = (material ? material : 'CBM').toUpperCase();
+
+    if (!acc[uniqueKey]) {
+      acc[uniqueKey] = {
+        label: displayLabel,
+        trips: []
+      };
+    }
+    
+    acc[uniqueKey].trips.push(t);
+    return acc;
+  }, {} as Record<string, { label: string; trips: Trip[] }>);
+
 
   // For Rekap and Photos Grouped by Lokasi Name
   const getLokasiName = (plId: number) => {
@@ -124,7 +137,11 @@ export default function PrintInvoice({
 
       <p className="mb-2">Mohon dibayarkan sesuai dengan rincian berikut:</p>
 
-      {Object.entries(tripGroups).map(([groupLabel, groupTrips], index) => {
+      {/* --- PERBAIKAN: Destructuring data struktur baru --- */}
+      {Object.entries(tripGroups).map(([uniqueKey, groupData], index) => {
+        const groupLabel = groupData.label;
+        const groupTrips = groupData.trips;
+
         // Group by Date and Location within this Label
         const groupedSummary = groupTrips.reduce((acc, t) => {
           const key = `${format(new Date(t.tanggal_muat), 'yyyy-MM-dd')}|${format(new Date(t.tanggal_bongkar), 'yyyy-MM-dd')}|${t.proyek_lokasi_id}`;
@@ -141,8 +158,10 @@ export default function PrintInvoice({
         const totalBersihGroup = totalKotorGroup - totalPotonganGroup;
 
         return (
-          <div key={groupLabel} className="mb-6">
-            <h3 className="font-bold mb-2">TABEL {index + 1}: {groupLabel}</h3>
+          // Tetap gunakan groupLabel sebagai key UI jika yakin nilainya cukup membedakan,
+          // atau lebih aman gunakan uniqueKey untuk mencegah warning React duplicate keys
+          <div key={uniqueKey} className="mb-6">
+            <h3 className="font-bold mb-2">{groupLabel}</h3>
             <table className="main-table w-full">
               <thead className={totalPotonganGroup > 0 ? "bg-amber-400 text-black" : "bg-[#00B0F0] text-black"}>
                 <tr>
@@ -354,4 +373,4 @@ export default function PrintInvoice({
 
     </div>
   );
-}
+} 
