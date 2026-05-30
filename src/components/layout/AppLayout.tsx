@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { Home, Database, Truck, FileText, Banknote, Settings, CreditCard, User, LineChart } from 'lucide-react';
+import { Home, Database, Truck, FileText, Banknote, Settings, CreditCard, User, LineChart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Toaster } from 'sonner';
+import { Button } from '@/components/ui/button';
 
 const navItems = [
   { icon: Home, label: 'Dashboard', path: '/app' },
@@ -22,6 +23,18 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const settingsArray = useLiveQuery(() => db.storeSettings.toArray());
   const settings = settingsArray?.[0];
+
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('sidebarCollapsed') === 'true';
+  });
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('sidebarCollapsed', String(next));
+      return next;
+    });
+  };
 
   useEffect(() => {
     // Only redirect if settings array is loaded, and it's not the onboarding page
@@ -50,30 +63,48 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Sidebar (Desktop) */}
-      <aside className="w-64 border-r bg-card hidden md:flex flex-col print:hidden">
-        <div className="p-6">
-          <h1 className="text-2xl font-bold text-primary">LogistikPro</h1>
+      <aside className={cn(
+        "border-r bg-card hidden md:flex flex-col print:hidden transition-all duration-300",
+        isSidebarCollapsed ? "w-20" : "w-64"
+      )}>
+        <div className={cn("p-6 flex items-center h-20", isSidebarCollapsed ? "justify-center" : "justify-between")}>
+          {!isSidebarCollapsed ? (
+            <h1 className="text-2xl font-bold text-primary">LogistikPro</h1>
+          ) : (
+            <h1 className="text-2xl font-bold text-primary">LP</h1>
+          )}
         </div>
-        <nav className="flex-1 px-4 space-y-2">
+        
+        <nav className={cn("flex-1 space-y-2", isSidebarCollapsed ? "px-2" : "px-4")}>
           {navItems.map(item => (
             <Link
               key={item.path}
               to={item.path}
+              title={isSidebarCollapsed ? item.label : undefined}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-lg text-sm font-medium transition-colors",
+                isSidebarCollapsed ? "justify-center py-3 px-0" : "px-4 py-3",
                 location.pathname === item.path || (location.pathname.startsWith(item.path) && item.path !== '/app')
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:bg-muted"
               )}
             >
-              <item.icon className="w-5 h-5" />
-              {item.label}
+              <item.icon className="w-5 h-5 shrink-0" />
+              {!isSidebarCollapsed && <span>{item.label}</span>}
             </Link>
           ))}
         </nav>
+
+        {/* Toggle Button */}
+        <div className="px-4 py-2 flex justify-center">
+           <Button variant="ghost" size="icon" onClick={toggleSidebar} className="text-muted-foreground hover:text-primary">
+             {isSidebarCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+           </Button>
+        </div>
+
         {/* User Profile Snippet in Sidebar */}
         <div className="p-4 border-t">
-          <Link to="/app/settings" className="flex items-center gap-3 hover:bg-muted p-2 rounded-lg transition">
+          <Link to="/app/settings" className={cn("flex items-center gap-3 hover:bg-muted rounded-lg transition", isSidebarCollapsed ? "p-1 justify-center" : "p-2")}>
             <div className="w-10 h-10 rounded-full bg-muted border flex items-center justify-center overflow-hidden shrink-0">
               {settings?.userAvatar ? (
                 <img src={settings.userAvatar} alt="Profile" className="w-full h-full object-cover" />
@@ -81,10 +112,12 @@ export default function AppLayout() {
                 <User className="w-5 h-5 text-muted-foreground" />
               )}
             </div>
-            <div className="overflow-hidden">
-              <p className="text-sm font-medium truncate">{settings?.userName || 'User'}</p>
-              <p className="text-xs text-muted-foreground truncate">{settings?.companyName || 'LogistikPro'}</p>
-            </div>
+            {!isSidebarCollapsed && (
+              <div className="overflow-hidden">
+                <p className="text-sm font-medium truncate">{settings?.userName || 'User'}</p>
+                <p className="text-xs text-muted-foreground truncate">{settings?.companyName || 'LogistikPro'}</p>
+              </div>
+            )}
           </Link>
         </div>
       </aside>
