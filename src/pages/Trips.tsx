@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { compressImage } from '@/lib/image-utils';
+import { compressImage, getCroppedImg } from '@/lib/image-utils';
+import Cropper from 'react-easy-crop';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -72,6 +73,14 @@ export default function Trips() {
   // Selection State
   const [selectedTrips, setSelectedTrips] = useState<number[]>([]);
   const [selectedPhotoForView, setSelectedPhotoForView] = useState<{ url: string; trip?: import('@/lib/db').Trip } | null>(null);
+  
+  // Cropper State
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
   const [invoiceSelectModalOpen, setInvoiceSelectModalOpen] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
 
@@ -164,10 +173,25 @@ export default function Trips() {
     if (file) {
       try {
         const compressedBase64 = await compressImage(file);
-        setPhoto(compressedBase64);
+        setImageToCrop(compressedBase64);
+        setCrop({ x: 0, y: 0 });
+        setZoom(1);
+        setRotation(0);
+        setCropModalOpen(true);
       } catch {
         toast.error('Gagal memproses gambar');
       }
+    }
+  };
+
+  const handleSaveCrop = async () => {
+    if (!imageToCrop || !croppedAreaPixels) return;
+    try {
+      const croppedImage = await getCroppedImg(imageToCrop, croppedAreaPixels, rotation);
+      setPhoto(croppedImage);
+      setCropModalOpen(false);
+    } catch {
+      toast.error('Gagal memotong gambar');
     }
   };
 
@@ -744,13 +768,31 @@ export default function Trips() {
                   <Label>Foto Bukti DO / Timbangan</Label>
                   <Input type="file" accept="image/*" onChange={handlePhotoUpload} />
                   {photo && (
-                    <img 
-                      src={photo} 
-                      alt="Preview" 
-                      className="h-24 w-24 object-cover rounded mt-2 cursor-pointer hover:opacity-80 transition-opacity border border-border shadow-sm" 
-                      onClick={() => setSelectedPhotoForView({ url: photo })}
-                      title="Klik untuk memperbesar"
-                    />
+                    <div className="relative inline-block mt-2">
+                      <img 
+                        src={photo} 
+                        alt="Preview" 
+                        className="h-24 w-24 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity border border-border shadow-sm" 
+                        onClick={() => setSelectedPhotoForView({ url: photo })}
+                        title="Klik untuk memperbesar"
+                      />
+                      <Button 
+                        size="sm" 
+                        variant="secondary" 
+                        className="absolute -top-2 -right-2 h-7 w-7 rounded-full p-0 flex items-center justify-center shadow-md"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setImageToCrop(photo);
+                          setCrop({ x: 0, y: 0 });
+                          setZoom(1);
+                          setRotation(0);
+                          setCropModalOpen(true);
+                        }}
+                        title="Edit Foto"
+                      >
+                        <Edit className="w-3 h-3" />
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
