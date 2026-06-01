@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { compressImage, getCroppedImg } from '@/lib/image-utils';
-import Cropper from 'react-easy-crop';
+import { compressImage } from '@/lib/image-utils';
+import { Cropper, ReactCropperElement } from 'react-cropper';
+import 'cropperjs/dist/cropper.css';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -75,12 +76,9 @@ export default function Trips() {
   const [selectedPhotoForView, setSelectedPhotoForView] = useState<{ url: string; trip?: import('@/lib/db').Trip } | null>(null);
   
   // Cropper State
+  const cropperRef = useRef<ReactCropperElement>(null);
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [rotation, setRotation] = useState(0);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
   const [editingTripFromTableId, setEditingTripFromTableId] = useState<number | null>(null);
   
   const [invoiceSelectModalOpen, setInvoiceSelectModalOpen] = useState(false);
@@ -176,9 +174,6 @@ export default function Trips() {
       try {
         const compressedBase64 = await compressImage(file);
         setImageToCrop(compressedBase64);
-        setCrop({ x: 0, y: 0 });
-        setZoom(1);
-        setRotation(0);
         setCropModalOpen(true);
       } catch {
         toast.error('Gagal memproses gambar');
@@ -187,23 +182,44 @@ export default function Trips() {
   };
 
   const handleSaveCrop = async () => {
-    if (!imageToCrop || !croppedAreaPixels) return;
+    if (typeof cropperRef.current?.cropper !== "undefined") {
+      try {
+        const croppedImage = cropperRef.current?.cropper.getCroppedCanvas({
+          maxWidth: 1200,
+          maxHeight: 1200,
+          fillColor: '#fff',
+        }).toDataURL('image/jpeg', 0.8);
+        
+        if (editingTripFromTableId) {
+          // Save directly to DB if edited from table
+          await db.trips.update(editingTripFromTableId, { bukti_do: croppedImage });
+          toast.success('Foto trip berhasil diperbarui!');
+          setEditingTripFromTableId(null);
+        } else {
+          // Set to local state for form input
+          setPhoto(croppedImage);
+        }
+        
+        setCropModalOpen(false);
+      } catch {
+        toast.error('Gagal memotong gambar');
+      }
+    }
+  };
+
+  const handleSaveOriginal = async () => {
+    if (!imageToCrop) return;
     try {
-      const croppedImage = await getCroppedImg(imageToCrop, croppedAreaPixels, rotation);
-      
       if (editingTripFromTableId) {
-        // Save directly to DB if edited from table
-        await db.trips.update(editingTripFromTableId, { bukti_do: croppedImage });
-        toast.success('Foto trip berhasil diperbarui!');
+        await db.trips.update(editingTripFromTableId, { bukti_do: imageToCrop });
+        toast.success('Foto trip berhasil diperbarui (tanpa crop)!');
         setEditingTripFromTableId(null);
       } else {
-        // Set to local state for form input
-        setPhoto(croppedImage);
+        setPhoto(imageToCrop);
       }
-      
       setCropModalOpen(false);
     } catch {
-      toast.error('Gagal memotong gambar');
+      toast.error('Gagal menyimpan gambar');
     }
   };
 
@@ -795,9 +811,6 @@ export default function Trips() {
                         onClick={(e) => {
                           e.preventDefault();
                           setImageToCrop(photo);
-                          setCrop({ x: 0, y: 0 });
-                          setZoom(1);
-                          setRotation(0);
                           setCropModalOpen(true);
                         }}
                         title="Edit Foto"
@@ -1127,9 +1140,6 @@ export default function Trips() {
                     className="absolute top-7 right-7 shadow-md"
                     onClick={() => {
                       setImageToCrop(selectedPhotoForView.url);
-                      setCrop({ x: 0, y: 0 });
-                      setZoom(1);
-                      setRotation(0);
                       setEditingTripFromTableId(selectedPhotoForView.trip!.id!);
                       setSelectedPhotoForView(null);
                       setCropModalOpen(true);
@@ -1180,57 +1190,38 @@ export default function Trips() {
         <DialogContent className="max-w-xl h-[85vh] flex flex-col p-4 bg-white">
           <DialogHeader>
             <DialogTitle>Edit Foto DO</DialogTitle>
-            <DialogDescription>Potong, perbesar, dan putar gambar agar bukti lebih jelas.</DialogDescription>
+            <DialogDescription>Bebas sesuaikan potongan gambar (Free Crop) dan putar bila perlu.</DialogDescription>
           </DialogHeader>
           <div className="relative flex-1 bg-black rounded-lg overflow-hidden my-4 min-h-[300px]">
             {imageToCrop && (
               <Cropper
-                image={imageToCrop}
-                crop={crop}
-                zoom={zoom}
-                rotation={rotation}
-                aspect={4 / 3}
-                onCropChange={setCrop}
-                onCropComplete={(_, croppedAreaPixels) => setCroppedAreaPixels(croppedAreaPixels)}
-                onZoomChange={setZoom}
-                onRotationChange={setRotation}
+                src={imageToCrop}
+                style={{ height: '100%', width: '100%' }}
+                initialAspectRatio={NaN}
+                guides={true}
+                ref={cropperRef}
+                viewMode={1}
+                dragMode="crop"
+                rotatable={true}
+                background={false}
               />
             )}
           </div>
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <Label className="w-16">Zoom</Label>
-              <input
-                type="range"
-                value={zoom}
-                min={1}
-                max={3}
-                step={0.1}
-                aria-labelledby="Zoom"
-                onChange={(e) => setZoom(Number(e.target.value))}
-                className="flex-1 accent-primary"
-              />
-            </div>
-            <div className="flex items-center gap-4">
-              <Label className="w-16">Rotasi</Label>
-              <input
-                type="range"
-                value={rotation}
-                min={0}
-                max={360}
-                step={1}
-                aria-labelledby="Rotation"
-                onChange={(e) => setRotation(Number(e.target.value))}
-                className="flex-1 accent-primary"
-              />
-            </div>
+          <div className="flex gap-4 justify-center">
+            <Button variant="outline" onClick={() => cropperRef.current?.cropper.rotate(-90)}>
+              Putar Kiri
+            </Button>
+            <Button variant="outline" onClick={() => cropperRef.current?.cropper.rotate(90)}>
+              Putar Kanan
+            </Button>
           </div>
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => {
+          <DialogFooter className="mt-4 flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" className="sm:mr-auto" onClick={() => {
               setCropModalOpen(false);
               setEditingTripFromTableId(null);
             }}>Batal</Button>
-            <Button onClick={handleSaveCrop}>Selesai & Terapkan</Button>
+            <Button variant="secondary" onClick={handleSaveOriginal}>Simpan Tanpa Crop</Button>
+            <Button onClick={handleSaveCrop}>Simpan Hasil Crop</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
