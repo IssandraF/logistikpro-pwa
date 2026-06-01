@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { format } from 'date-fns';
 
 import { toast } from 'sonner';
-import { Trash2, FileText, Download, Printer, Plus, DownloadCloud, UploadCloud, Edit, Eye } from 'lucide-react';
+import { Trash2, FileText, Download, Printer, Plus, DownloadCloud, UploadCloud, Edit, Eye, Image as ImageIcon } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import PrintRekapTrips from '@/components/PrintRekapTrips';
 import { printWithTitle } from '@/lib/print-utils';
@@ -71,6 +71,7 @@ export default function Trips() {
 
   // Selection State
   const [selectedTrips, setSelectedTrips] = useState<number[]>([]);
+  const [selectedPhotoForView, setSelectedPhotoForView] = useState<{ url: string; trip?: import('@/lib/db').Trip } | null>(null);
   const [invoiceSelectModalOpen, setInvoiceSelectModalOpen] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
 
@@ -620,6 +621,7 @@ export default function Trips() {
                       <th className="p-3">Kuari</th>
                       <th className="p-3">Volume</th>
                       <th className="p-3">Status</th>
+                      <th className="p-3 text-center">Foto</th>
                       <th className="p-3">Aksi</th>
                     </tr>
                   </thead>
@@ -646,6 +648,13 @@ export default function Trips() {
                         <td className="p-3">{t.volume}</td>
                         <td className="p-3">
                           {t.invoice_id ? <span className="bg-success/20 text-success px-2 py-1 rounded text-xs">Di-invoice</span> : <span className="bg-warning/20 text-warning px-2 py-1 rounded text-xs">Pending</span>}
+                        </td>
+                        <td className="p-3 text-center">
+                          {t.bukti_do ? (
+                            <Button variant="ghost" size="icon" onClick={() => setSelectedPhotoForView({ url: t.bukti_do!, trip: t })} title="Lihat Foto DO">
+                              <ImageIcon className="w-4 h-4 text-primary" />
+                            </Button>
+                          ) : '-'}
                         </td>
                         <td className="p-3 flex gap-2">
                           <Button variant="ghost" size="icon" onClick={() => editTrip(t)}><Edit className="w-4 h-4 text-blue-500" /></Button>
@@ -734,7 +743,15 @@ export default function Trips() {
                 <div className="space-y-2">
                   <Label>Foto Bukti DO / Timbangan</Label>
                   <Input type="file" accept="image/*" onChange={handlePhotoUpload} />
-                  {photo && <img src={photo} alt="Preview" className="h-24 w-24 object-cover rounded mt-2" />}
+                  {photo && (
+                    <img 
+                      src={photo} 
+                      alt="Preview" 
+                      className="h-24 w-24 object-cover rounded mt-2 cursor-pointer hover:opacity-80 transition-opacity border border-border shadow-sm" 
+                      onClick={() => setSelectedPhotoForView({ url: photo })}
+                      title="Klik untuk memperbesar"
+                    />
+                  )}
                 </div>
               </div>
               <div className="flex gap-4 mt-4">
@@ -1035,6 +1052,55 @@ export default function Trips() {
           hargaMaterialMap={hargaMaterialMap}
         />
       )}
+
+      {/* Modal Foto Bukti DO (Desain Grid) */}
+      <Dialog open={!!selectedPhotoForView} onOpenChange={(open) => { if (!open) setSelectedPhotoForView(null); }}>
+        <DialogContent className="max-w-2xl p-0 overflow-hidden bg-white gap-0">
+          <DialogHeader className="p-4 border-b bg-muted/20">
+            <DialogTitle>{selectedPhotoForView?.trip ? 'Foto Bukti Bongkar' : 'Preview Foto DO'}</DialogTitle>
+          </DialogHeader>
+          <div className="p-5">
+            {selectedPhotoForView?.url && (
+              <img 
+                src={selectedPhotoForView.url} 
+                alt="Bukti DO" 
+                className="w-full h-[200px] sm:h-[300px] object-cover rounded-md bg-muted"
+              />
+            )}
+            
+            {selectedPhotoForView?.trip && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-5 pt-5 border-t">
+                <div className="flex flex-col">
+                  <span className="text-xs text-muted-foreground mb-1">Plat Nomor</span>
+                  <span className="text-sm font-semibold text-foreground">{selectedPhotoForView.trip.plat_nomor}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs text-muted-foreground mb-1">Volume</span>
+                  <span className="text-sm font-semibold text-foreground">{selectedPhotoForView.trip.volume} m&sup3;</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs text-muted-foreground mb-1">Kuari</span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {kuaris?.find(k => k.id === selectedPhotoForView.trip?.lokasi_kuari_id)?.nama_lokasi || '-'}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs text-muted-foreground mb-1">Tujuan / Proyek</span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {(() => {
+                      const pl = proyekLokasis?.find(p => p.id === selectedPhotoForView.trip?.proyek_lokasi_id);
+                      if (!pl) return '-';
+                      const pName = proyeks?.find(p => p.id === pl.proyek_id)?.nama_proyek;
+                      const lName = lokasiProyeks?.find(l => l.id === pl.lokasi_proyek_id)?.nama_lokasi;
+                      return `${pName || ''} - ${lName || ''}`;
+                    })()}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
