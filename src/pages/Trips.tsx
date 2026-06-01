@@ -81,6 +81,8 @@ export default function Trips() {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+  const [editingTripFromTableId, setEditingTripFromTableId] = useState<number | null>(null);
+  
   const [invoiceSelectModalOpen, setInvoiceSelectModalOpen] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
 
@@ -188,7 +190,17 @@ export default function Trips() {
     if (!imageToCrop || !croppedAreaPixels) return;
     try {
       const croppedImage = await getCroppedImg(imageToCrop, croppedAreaPixels, rotation);
-      setPhoto(croppedImage);
+      
+      if (editingTripFromTableId) {
+        // Save directly to DB if edited from table
+        await db.trips.update(editingTripFromTableId, { bukti_do: croppedImage });
+        toast.success('Foto trip berhasil diperbarui!');
+        setEditingTripFromTableId(null);
+      } else {
+        // Set to local state for form input
+        setPhoto(croppedImage);
+      }
+      
       setCropModalOpen(false);
     } catch {
       toast.error('Gagal memotong gambar');
@@ -1101,13 +1113,32 @@ export default function Trips() {
           <DialogHeader className="p-4 border-b bg-muted/20">
             <DialogTitle>{selectedPhotoForView?.trip ? 'Foto Bukti Bongkar' : 'Preview Foto DO'}</DialogTitle>
           </DialogHeader>
-          <div className="p-5">
+          <div className="p-5 relative">
             {selectedPhotoForView?.url && (
-              <img 
-                src={selectedPhotoForView.url} 
-                alt="Bukti DO" 
-                className="w-full h-[200px] sm:h-[300px] object-contain rounded-md bg-muted"
-              />
+              <>
+                <img 
+                  src={selectedPhotoForView.url} 
+                  alt="Bukti DO" 
+                  className="w-full h-[200px] sm:h-[300px] object-contain rounded-md bg-muted"
+                />
+                {selectedPhotoForView.trip && (
+                  <Button 
+                    size="sm" 
+                    className="absolute top-7 right-7 shadow-md"
+                    onClick={() => {
+                      setImageToCrop(selectedPhotoForView.url);
+                      setCrop({ x: 0, y: 0 });
+                      setZoom(1);
+                      setRotation(0);
+                      setEditingTripFromTableId(selectedPhotoForView.trip!.id!);
+                      setSelectedPhotoForView(null);
+                      setCropModalOpen(true);
+                    }}
+                  >
+                    <Edit className="w-4 h-4 mr-2" /> Edit Foto
+                  </Button>
+                )}
+              </>
             )}
             
             {selectedPhotoForView?.trip && (
@@ -1141,6 +1172,66 @@ export default function Trips() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Cropper */}
+      <Dialog open={cropModalOpen} onOpenChange={setCropModalOpen}>
+        <DialogContent className="max-w-xl h-[85vh] flex flex-col p-4 bg-white">
+          <DialogHeader>
+            <DialogTitle>Edit Foto DO</DialogTitle>
+            <DialogDescription>Potong, perbesar, dan putar gambar agar bukti lebih jelas.</DialogDescription>
+          </DialogHeader>
+          <div className="relative flex-1 bg-black rounded-lg overflow-hidden my-4 min-h-[300px]">
+            {imageToCrop && (
+              <Cropper
+                image={imageToCrop}
+                crop={crop}
+                zoom={zoom}
+                rotation={rotation}
+                aspect={4 / 3}
+                onCropChange={setCrop}
+                onCropComplete={(_, croppedAreaPixels) => setCroppedAreaPixels(croppedAreaPixels)}
+                onZoomChange={setZoom}
+                onRotationChange={setRotation}
+              />
+            )}
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <Label className="w-16">Zoom</Label>
+              <input
+                type="range"
+                value={zoom}
+                min={1}
+                max={3}
+                step={0.1}
+                aria-labelledby="Zoom"
+                onChange={(e) => setZoom(Number(e.target.value))}
+                className="flex-1 accent-primary"
+              />
+            </div>
+            <div className="flex items-center gap-4">
+              <Label className="w-16">Rotasi</Label>
+              <input
+                type="range"
+                value={rotation}
+                min={0}
+                max={360}
+                step={1}
+                aria-labelledby="Rotation"
+                onChange={(e) => setRotation(Number(e.target.value))}
+                className="flex-1 accent-primary"
+              />
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => {
+              setCropModalOpen(false);
+              setEditingTripFromTableId(null);
+            }}>Batal</Button>
+            <Button onClick={handleSaveCrop}>Selesai & Terapkan</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
