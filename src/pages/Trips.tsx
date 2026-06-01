@@ -1064,7 +1064,7 @@ export default function Trips() {
               <img 
                 src={selectedPhotoForView.url} 
                 alt="Bukti DO" 
-                className="w-full h-[200px] sm:h-[300px] object-cover rounded-md bg-muted"
+                className="w-full h-[200px] sm:h-[300px] object-contain rounded-md bg-muted"
               />
             )}
             
