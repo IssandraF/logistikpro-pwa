@@ -142,9 +142,9 @@ export default function PrintInvoice({
         const groupLabel = groupData.label;
         const groupTrips = groupData.trips;
 
-        // Group by Date and Location within this Label
+        // Group by Date, Location, and Harga Trip within this Label
         const groupedSummary = groupTrips.reduce((acc, t) => {
-          const key = `${format(new Date(t.tanggal_muat), 'yyyy-MM-dd')}|${format(new Date(t.tanggal_bongkar), 'yyyy-MM-dd')}|${t.proyek_lokasi_id}`;
+          const key = `${format(new Date(t.tanggal_muat), 'yyyy-MM-dd')}|${format(new Date(t.tanggal_bongkar), 'yyyy-MM-dd')}|${t.proyek_lokasi_id}|${t.harga_trip}`;
           if (!acc[key]) acc[key] = [];
           acc[key].push(t);
           return acc;
@@ -153,7 +153,7 @@ export default function PrintInvoice({
         let noSummary = 1;
         let lastDateCbm: string | null = null;
         const totalVolumeGroup = groupTrips.reduce((s, t) => s + t.volume, 0);
-        const totalKotorGroup = groupTrips.reduce((s, t) => s + (t.volume * t.harga_trip), 0);
+        const totalKotorGroup = groupTrips.reduce((s, t) => s + (t.total_harga || (t.volume * t.harga_trip)), 0);
         const totalPotonganGroup = groupTrips.reduce((s, t) => s + (t.potongan_material_invoice || 0), 0);
         const totalBersihGroup = totalKotorGroup - totalPotonganGroup;
 
@@ -194,7 +194,7 @@ export default function PrintInvoice({
                   lastDateCbm = currentDateCombo;
 
                   const totalVol = items.reduce((sum, t) => sum + t.volume, 0);
-                  const totalHarga = totalVol * first.harga_trip;
+                  const totalHarga = items.reduce((sum, t) => sum + (t.total_harga || (t.volume * t.harga_trip)), 0);
 
                   return (
                     <tr key={key}>
