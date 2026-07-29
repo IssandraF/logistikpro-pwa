@@ -88,9 +88,8 @@ export default function PrintRekapTrips({
               <tr>
                 <th className="text-center w-[5%]">No</th>
                 <th className="text-center">Lokasi Bongkar (Proyek - Tujuan)</th>
-                <th className="text-center w-[15%]">Jumlah Rit</th>
-                <th className="text-center w-[20%]">Volume (m³)</th>
-                <th className="text-center w-[25%]">Total Harga (Rp)</th>
+                <th className="text-center w-[20%]">Jumlah Rit</th>
+                <th className="text-center w-[25%]">Volume (m³)</th>
               </tr>
             </thead>
             <tbody>
@@ -100,7 +99,6 @@ export default function PrintRekapTrips({
                   <td className="pl-2 font-medium">{getLokasiName(Number(plIdStr))}</td>
                   <td className="text-center">{grupLokasi.length} Rit</td>
                   <td className="text-center">{grupLokasi.reduce((s, t) => s + t.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td className="text-right pr-2">Rp {grupLokasi.reduce((s, t) => s + t.total_harga, 0).toLocaleString('id-ID')}</td>
                 </tr>
               ))}
             </tbody>
@@ -109,7 +107,6 @@ export default function PrintRekapTrips({
                 <th colSpan={2} className="text-right pr-2">TOTAL KESELURUHAN:</th>
                 <th className="text-center">{trips.length} Rit</th>
                 <th className="text-center">{trips.reduce((s, t) => s + t.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</th>
-                <th className="text-right pr-2">Rp {trips.reduce((s, t) => s + t.total_harga, 0).toLocaleString('id-ID')}</th>
               </tr>
             </tfoot>
           </table>
@@ -124,45 +121,31 @@ export default function PrintRekapTrips({
                 <tr>
                   <th className="text-center">Tempat Muat (Kuari)</th>
                   <th className="text-center">Tujuan / Lokasi Bongkar</th>
-                  <th className="text-center">Harga Material / Trip</th>
-                  <th className="text-center">Jumlah Rit</th>
-                  <th className="text-center">Total Volume</th>
-                  <th className="text-center">Total Harga Material</th>
+                  <th className="text-center w-[20%]">Jumlah Rit</th>
+                  <th className="text-center w-[25%]">Total Volume</th>
                 </tr>
               </thead>
               <tbody>
                 {Object.entries(rekapanKuari).map(([key, grup]) => {
                   const parts = key.split('|');
-                  const kId = Number(parts[0]);
                   const kuari = parts[1];
                   const bongkar = parts[2];
-                  
-                  const hrgMat = hargaMaterialMap[kId] || 0;
-                  const materialCost = hrgMat * grup.length;
                   
                   return (
                     <tr key={key}>
                       <td className="pl-2">{kuari}</td>
                       <td className="pl-2">{bongkar}</td>
-                      <td className="text-right pr-2">Rp {hrgMat.toLocaleString('id-ID')}</td>
                       <td className="text-center">{grup.length} Rit</td>
                       <td className="text-center">{grup.reduce((s, x) => s + x.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="text-right pr-2">Rp {materialCost.toLocaleString('id-ID')}</td>
                     </tr>
                   );
                 })}
               </tbody>
               <tfoot>
                 <tr className="bg-[#f8f9fa] font-bold">
-                  <th colSpan={3} className="text-right pr-2">TOTAL:</th>
+                  <th colSpan={2} className="text-right pr-2">TOTAL:</th>
                   <th className="text-center">{trips.length} Rit</th>
                   <th className="text-center">{trips.reduce((s, t) => s + t.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</th>
-                  <th className="text-right pr-2">
-                    Rp {Object.entries(rekapanKuari).reduce((sum, [key, grup]) => {
-                      const kId = Number(key.split('|')[0]);
-                      return sum + ((hargaMaterialMap[kId] || 0) * grup.length);
-                    }, 0).toLocaleString('id-ID')}
-                  </th>
                 </tr>
               </tfoot>
             </table>
@@ -205,7 +188,7 @@ export default function PrintRekapTrips({
               <h3 className="text-[18px] font-bold mb-1">Rincian Trip - {lokasiName}</h3>
             </div>
 
-            {Object.entries(groupedByDate).sort(([a], [b]) => a.localeCompare(b)).map(([tgl, harian], idxDate) => (
+            {Object.entries(groupedByDate).sort(([a], [b]) => a.localeCompare(b)).map(([tgl, harian]) => (
               <div key={tgl} style={{ marginBottom: '20px', pageBreakInside: 'avoid' }}>
                 <p className="font-bold text-[14px] mb-2">Tanggal Bongkar: {format(new Date(tgl), 'dd MMMM yyyy', { locale: id })}</p>
                 
@@ -213,11 +196,10 @@ export default function PrintRekapTrips({
                   <thead className="bg-[#f8f9fa]">
                     <tr>
                       <th className="w-[5%] text-center">No</th>
-                      <th className="w-[15%] text-center">Tgl Muat</th>
-                      <th className="w-[20%] text-center">Tempat Muat (Kuari)</th>
-                      <th className="w-[15%] text-center">Plat Nomor</th>
-                      <th className="w-[10%] text-center">Volume</th>
-                      <th className="w-[15%] text-center">Total (Rp)</th>
+                      <th className="w-[20%] text-center">Tgl Muat</th>
+                      <th className="w-[30%] text-center">Tempat Muat (Kuari)</th>
+                      <th className="w-[25%] text-center">Plat Nomor</th>
+                      <th className="w-[20%] text-center">Volume</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -228,7 +210,6 @@ export default function PrintRekapTrips({
                         <td className="text-center">{getKuariName(trip.lokasi_kuari_id)}</td>
                         <td className="text-center font-bold">{trip.plat_nomor}</td>
                         <td className="text-center">{trip.volume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className="text-right pr-2">{trip.total_harga.toLocaleString('id-ID')}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -236,7 +217,6 @@ export default function PrintRekapTrips({
                     <tr className="bg-[#f8f9fa] font-bold">
                       <th colSpan={4} className="text-right pr-2">SUBTOTAL TANGGAL {format(new Date(tgl), 'dd/MM/yyyy')}:</th>
                       <th className="text-center">{harian.reduce((s, x) => s + x.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</th>
-                      <th className="text-right pr-2">{harian.reduce((s, x) => s + x.total_harga, 0).toLocaleString('id-ID')}</th>
                     </tr>
                   </tfoot>
                 </table>

@@ -18,7 +18,7 @@ import { Trash2, FileText, Download, Printer, Plus, DownloadCloud, UploadCloud, 
 import * as XLSX from 'xlsx';
 import PrintRekapTrips from '@/components/PrintRekapTrips';
 import { printWithTitle } from '@/lib/print-utils';
-import { exportSmartTrips, importSmartTrips } from '@/lib/sync-utils';
+import { exportSmartTrips, importSmartTrips, syncInvoiceTotals, syncSlipTotals } from '@/lib/sync-utils';
 
 export default function Trips() {
   const [activeTab, setActiveTab] = useState('data');
@@ -245,37 +245,6 @@ export default function Trips() {
     setGrupId(''); setPlatNomor(''); setProyekLokasiId(''); setKuariId(''); setJasaId(''); setMaterialId(''); setVolume(''); setHargaTrip(''); setTglMuat(''); setTglBongkar(''); setPhoto(null);
   };
 
-  const syncInvoiceTotals = async (invoiceId: number) => {
-    const invTrips = await db.trips.where('invoice_id').equals(invoiceId).filter(t => t.isDeleted === 0).toArray();
-    const qPrices = await db.invoiceQuarryPrices.where('invoice_id').equals(invoiceId).toArray();
-    
-    let vol = 0;
-    let kotor = 0;
-    const kuariMap: Record<number, number> = {};
-    
-    invTrips.forEach(t => {
-      vol += t.volume;
-      kotor += t.total_harga;
-      kuariMap[t.lokasi_kuari_id] = (kuariMap[t.lokasi_kuari_id] || 0) + 1;
-    });
-
-    let potongan = 0;
-    for (const qp of qPrices) {
-      const count = kuariMap[qp.lokasi_kuari_id] || 0;
-      await db.invoiceQuarryPrices.update(qp.id!, { jumlah_trip: count });
-      potongan += count * qp.harga_material_override;
-    }
-
-    const bersih = kotor - potongan;
-
-    await db.invoices.update(invoiceId, {
-      total_kubikasi: vol,
-      total_harga_kotor: kotor,
-      total_potongan_material: potongan,
-      total_harga_bersih: bersih
-    });
-  };
-
   const handleAddToInvoice = async () => {
     if (!selectedInvoiceId) return toast.error('Pilih invoice terlebih dahulu');
     if (selectedTrips.length === 0) return toast.error('Belum ada trip yang dipilih');
@@ -336,6 +305,9 @@ export default function Trips() {
 
       if (existingTrip?.invoice_id) {
         await syncInvoiceTotals(existingTrip.invoice_id);
+      }
+      if (existingTrip?.slip_pembayaran_id) {
+        await syncSlipTotals(existingTrip.slip_pembayaran_id);
       }
 
       toast.success('Trip berhasil diperbarui');
@@ -446,6 +418,9 @@ export default function Trips() {
     if (existing?.invoice_id) {
       await syncInvoiceTotals(existing.invoice_id);
     }
+    if (existing?.slip_pembayaran_id) {
+      await syncSlipTotals(existing.slip_pembayaran_id);
+    }
     toast.success('Trip dihapus');
   };
 
@@ -517,7 +492,7 @@ export default function Trips() {
     }
     aoa.push([]);
     
-    aoa.push(['NO', 'TANGGAL BONGKAR', 'GRUP MOBIL', 'PLAT NOMOR', 'ASAL KUARI', 'VOLUME', 'TOTAL HARGA']);
+    aoa.push(['NO', 'TANGGAL BONGKAR', 'GRUP MOBIL', 'PLAT NOMOR', 'ASAL KUARI', 'VOLUME']);
     
     filteredTrips.forEach((t, idx) => {
       const grup = grupMobils?.find(g => g.id === t.grup_mobil_id)?.nama_grup || '';
@@ -528,21 +503,19 @@ export default function Trips() {
         grup,
         t.plat_nomor,
         kuari,
-        t.volume,
-        t.total_harga
+        t.volume
       ]);
     });
     
     const totalVol = filteredTrips.reduce((s, t) => s + t.volume, 0);
-    const totalHrg = filteredTrips.reduce((s, t) => s + t.total_harga, 0);
     aoa.push([]);
-    aoa.push(['', '', '', '', 'TOTAL KESELURUHAN', totalVol, totalHrg]);
+    aoa.push(['', '', '', '', 'TOTAL KESELURUHAN', totalVol]);
 
     if (showRingkasanKuari) {
       aoa.push([]);
       aoa.push([]);
       aoa.push(['RINGKASAN TEMPAT MUAT (KUARI)']);
-      aoa.push(['ASAL KUARI', 'HARGA MATERIAL/TRIP', 'JUMLAH RIT', 'TOTAL VOLUME', 'TOTAL HARGA MATERIAL']);
+      aoa.push(['ASAL KUARI', 'JUMLAH RIT', 'TOTAL VOLUME']);
       
       const kuariGroups = filteredTrips.reduce((acc, t) => {
         if (!acc[t.lokasi_kuari_id]) acc[t.lokasi_kuari_id] = [];
@@ -550,20 +523,17 @@ export default function Trips() {
         return acc;
       }, {} as Record<number, typeof filteredTrips>);
       
-      const hrgMatMap = hargaMaterialMap || {};
-      
       Object.entries(kuariGroups).forEach(([kId, items]) => {
         const kIdNum = Number(kId);
         const kName = kuaris?.find(k => k.id === kIdNum)?.nama_lokasi || '-';
         const vol = items.reduce((s, t) => s + t.volume, 0);
-        const hrgMat = hrgMatMap[kIdNum] || 0;
-        aoa.push([kName, hrgMat, items.length, vol, items.length * hrgMat]);
+        aoa.push([kName, items.length, vol]);
       });
     }
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols'] = [
-      { wch: 5 },  { wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 15 },
+      { wch: 5 },  { wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 12 },
     ];
 
     const wb = XLSX.utils.book_new();
@@ -1016,30 +986,8 @@ export default function Trips() {
               <div className={`p-1 rounded ${showRingkasanKuari ? 'bg-primary text-primary-foreground' : 'border bg-background text-transparent'}`}>
                 <FileText className="w-4 h-4" />
               </div>
-              <span className="font-medium select-none">Tampilkan Ringkasan Kuari/Material?</span>
+              <span className="font-medium select-none">Tampilkan Ringkasan Tempat Muat (Kuari)?</span>
             </div>
-
-            {showRingkasanKuari && (
-              <div className="space-y-3 animate-in fade-in slide-in-from-top-2 border rounded-lg p-4 bg-muted/20">
-                <p className="text-sm font-semibold">Harga Material per Kuari (Opsional)</p>
-                {uniqueKuaris.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Tidak ada trip di rentang tanggal/proyek tersebut.</p>
-                ) : (
-                  uniqueKuaris.map(k => (
-                    <div key={k.id} className="flex flex-col gap-1">
-                      <Label className="text-xs">{k.nama_lokasi}</Label>
-                      <Input 
-                        type="number" 
-                        placeholder="Harga/Rit" 
-                        value={hargaMaterialMap[k.id!] || ''} 
-                        onChange={e => setHargaMaterialMap({...hargaMaterialMap, [k.id!]: Number(e.target.value)})} 
-                      />
-                    </div>
-                  ))
-                )}
-                <p className="text-xs text-muted-foreground mt-2">Harga ini akan dikalikan dengan Jumlah Ritase di tabel Ringkasan Tempat Muat.</p>
-              </div>
-            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPrintModalOpen(false)}>Batal</Button>

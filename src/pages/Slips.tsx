@@ -14,6 +14,7 @@ import * as XLSX from 'xlsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import PrintSlip from '@/components/PrintSlip';
 import { printWithTitle } from '@/lib/print-utils';
+import { syncSlipTotals } from '@/lib/sync-utils';
 
 export default function Slips() {
   const [activeTab, setActiveTab] = useState('data');

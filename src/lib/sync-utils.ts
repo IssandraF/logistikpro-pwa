@@ -269,17 +269,67 @@ export const importSmartInvoices = async (file: File) => {
   return { imported, skipped };
 };
 
-// --- HELPERS ---
+// --- SYNC TOTALS HELPERS ---
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const downloadJSON = (data: any, prefix: string) => {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${prefix}_${new Date().toISOString().split('T')[0]}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+export const syncInvoiceTotals = async (invoiceId: number) => {
+  const invTrips = await db.trips.where('invoice_id').equals(invoiceId).filter(t => t.isDeleted === 0).toArray();
+  const qPrices = await db.invoiceQuarryPrices.where('invoice_id').equals(invoiceId).toArray();
+  
+  let vol = 0;
+  let kotor = 0;
+  const kuariMap: Record<number, number> = {};
+  
+  invTrips.forEach(t => {
+    vol += t.volume;
+    kotor += t.total_harga;
+    kuariMap[t.lokasi_kuari_id] = (kuariMap[t.lokasi_kuari_id] || 0) + 1;
+  });
+
+  let potongan = 0;
+  for (const qp of qPrices) {
+    const count = kuariMap[qp.lokasi_kuari_id] || 0;
+    await db.invoiceQuarryPrices.update(qp.id!, { jumlah_trip: count });
+    potongan += count * qp.harga_material_override;
+  }
+
+  const bersih = kotor - potongan;
+
+  await db.invoices.update(invoiceId, {
+    total_kubikasi: vol,
+    total_harga_kotor: kotor,
+    total_potongan_material: potongan,
+    total_harga_bersih: bersih
+  });
 };
+
+export const syncSlipTotals = async (slipId: number) => {
+  const slip = await db.slipPembayarans.get(slipId);
+  if (!slip) return;
+
+  const slipTrips = await db.trips.where('slip_pembayaran_id').equals(slipId).filter(t => t.isDeleted === 0).toArray();
+
+  let totalTripOngkos = 0;
+  let totalPotonganMaterial = 0;
+
+  slipTrips.forEach(t => {
+    const hargaBayar = t.harga_bayar !== undefined && t.harga_bayar !== null ? t.harga_bayar : t.harga_trip;
+    totalTripOngkos += t.volume * hargaBayar;
+    totalPotonganMaterial += (t.potongan_trip || 0) * t.volume;
+  });
+
+  const totalBersih = totalTripOngkos - totalPotonganMaterial - (slip.potongan_kasbon || 0);
+
+  await db.slipPembayarans.update(slipId, {
+    total_trip_ongkos: totalTripOngkos,
+    potongan_material: totalPotonganMaterial,
+    total_bersih_dibayar: totalBersih
+  });
+
+  const kasEntries = await db.kas.where('slip_pembayaran_id').equals(slipId).toArray();
+  for (const k of kasEntries) {
+    await db.kas.update(k.id!, {
+      nominal: totalBersih
+    });
+  }
+};
+
