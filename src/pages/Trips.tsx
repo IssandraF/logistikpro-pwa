@@ -1088,6 +1088,27 @@ export default function Trips() {
                     onChange={e => setDtLokasiDetail(e.target.value)} 
                     placeholder="Contoh: STA 194 Pekanbaru" 
                   />
+                  {(() => {
+                    const selC = dailyContracts?.find(c => String(c.id) === dtContractId);
+                    const locs = selC?.lokasi_proyek_list && selC.lokasi_proyek_list.length > 0
+                      ? selC.lokasi_proyek_list
+                      : (selC?.lokasi_proyek_nama ? selC.lokasi_proyek_nama.split(',').map(s => s.trim()).filter(Boolean) : []);
+                    if (!locs.length) return null;
+                    return (
+                      <div className="flex gap-1 flex-wrap mt-1">
+                        {locs.map((loc, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setDtLokasiDetail(loc)}
+                            className="text-[11px] bg-emerald-50 text-emerald-800 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200"
+                          >
+                            {loc}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="space-y-2">

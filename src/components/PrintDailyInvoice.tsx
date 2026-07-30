@@ -92,7 +92,23 @@ export default function PrintDailyInvoice({
   const bankAn = contract?.bank_atas_nama || owner?.atas_nama || 'Irma Fitriani Dalimunte';
 
   return (
-    <div className={isPreview ? "invoice-preview-wrapper" : "invoice-print-container"} style={printContainerStyle}>
+    <div className={isPreview ? "invoice-preview-wrapper bg-white text-black p-4" : "hidden print:block invoice-print-container"} style={printContainerStyle}>
+      <style type="text/css" media="print">
+        {`
+          @page {
+            size: ${paperSize} !important;
+            margin: 5mm;
+          }
+          .invoice-print-container {
+            zoom: ${printScale / 100} !important;
+          }
+          .page-break-before {
+            page-break-before: always !important;
+            break-before: page !important;
+          }
+        `}
+      </style>
+
       {/* HEADER PERUSAHAAN / PEMILIK ALAT */}
       <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-4">
         <div>
@@ -221,8 +237,11 @@ export default function PrintDailyInvoice({
         </div>
       </div>
 
-      {/* HALAMAN LAMPIRAN TIMESHEET (REKAP HARIAN) */}
-      <div className="page-break-before mt-12 pt-6 border-t-2 border-dashed border-gray-400">
+      {/* HALAMAN LAMPIRAN TIMESHEET (REKAP HARIAN) - DI HALAMAN KE DUA */}
+      <div 
+        className="page-break-before break-before-page print:break-before-page mt-12 pt-6 border-t-2 border-dashed border-gray-400"
+        style={{ pageBreakBefore: 'always', breakBefore: 'page' }}
+      >
         <div className="flex justify-between items-center mb-4">
           <div>
             <h3 className="font-bold text-sm uppercase text-gray-900">LAMPIRAN REKAPITULASI TIMESHEET HARIAN</h3>

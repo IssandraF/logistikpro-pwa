@@ -299,6 +299,11 @@ export default function MasterData() {
       .map(s => s.trim().toUpperCase())
       .filter(Boolean);
 
+    const lokasiList = lokasiProyekNama
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+
     const contractData = {
       nomor_kontrak: nomorKontrak.trim(),
       pihak_pertama_nama: pihak1Nama.trim(),
@@ -310,7 +315,8 @@ export default function MasterData() {
       pihak_kedua_alamat: pihak2Alamat.trim(),
       pihak_kedua_hp: pihak2Hp.trim(),
       proyek_id: Number(contractProyekId),
-      lokasi_proyek_nama: lokasiProyekNama.trim(),
+      lokasi_proyek_nama: lokasiList.join(', '),
+      lokasi_proyek_list: lokasiList,
       tarif_harian: Number(tarifHarian) || 0,
       pph_persen: Number(pphPersen) || 0,
       bank_nama: dtBankNama.trim(),
@@ -345,7 +351,7 @@ export default function MasterData() {
     setPihak2Alamat(c.pihak_kedua_alamat || '');
     setPihak2Hp(c.pihak_kedua_hp || '');
     setContractProyekId(c.proyek_id ? String(c.proyek_id) : '');
-    setLokasiProyekNama(c.lokasi_proyek_nama || '');
+    setLokasiProyekNama(Array.isArray(c.lokasi_proyek_list) && c.lokasi_proyek_list.length > 0 ? c.lokasi_proyek_list.join(', ') : c.lokasi_proyek_nama || '');
     setTarifHarian(String(c.tarif_harian || 1600000));
     setPphPersen(String(c.pph_persen ?? 2));
     setDtBankNama(c.bank_nama || '');
@@ -689,8 +695,8 @@ export default function MasterData() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Lokasi Proyek / Detail STA</Label>
-                  <Input value={lokasiProyekNama} onChange={e => setLokasiProyekNama(e.target.value)} placeholder="STA 194 Pekanbaru" />
+                  <Label>Daftar Lokasi Proyek / Detail STA (Pisah Koma)</Label>
+                  <Input value={lokasiProyekNama} onChange={e => setLokasiProyekNama(e.target.value)} placeholder="STA 194, STA 200, Sektor Kuari" />
                 </div>
 
                 <div className="space-y-2">
@@ -747,10 +753,13 @@ export default function MasterData() {
                 ) : (
                   dailyContracts?.map(c => {
                     const pr = proyeks?.find(p => p.id === c.proyek_id);
+                    const lokasiList = c.lokasi_proyek_list && c.lokasi_proyek_list.length > 0
+                      ? c.lokasi_proyek_list
+                      : (c.lokasi_proyek_nama ? c.lokasi_proyek_nama.split(',').map(s => s.trim()).filter(Boolean) : []);
                     return (
                       <div key={c.id} className="p-4 border rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card">
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-bold text-lg">{c.nomor_kontrak}</span>
                             <span className="bg-primary/10 text-primary text-xs px-2 py-0.5 rounded font-medium">{pr?.nama_proyek || 'Proyek'}</span>
                           </div>
@@ -760,13 +769,24 @@ export default function MasterData() {
                           <p className="text-sm text-muted-foreground">
                             Tarif: <span className="font-semibold text-emerald-600">Rp {(c.tarif_harian || 0).toLocaleString('id-ID')}/Hari</span> | PPh: {c.pph_persen || 0}% | Bank: {c.bank_nama} {c.bank_rekening} a.n {c.bank_atas_nama}
                           </p>
-                          {c.unit_nopol_list && c.unit_nopol_list.length > 0 && (
-                            <div className="flex gap-1.5 flex-wrap mt-2">
-                              {c.unit_nopol_list.map((np, idx) => (
-                                <span key={idx} className="bg-muted text-xs font-mono px-2 py-0.5 rounded border">{np}</span>
-                              ))}
-                            </div>
-                          )}
+                          <div className="flex flex-col gap-1.5 mt-2">
+                            {lokasiList.length > 0 && (
+                              <div className="flex gap-1.5 flex-wrap items-center">
+                                <span className="text-xs font-semibold text-muted-foreground">Lokasi:</span>
+                                {lokasiList.map((loc, idx) => (
+                                  <span key={idx} className="bg-emerald-50 text-emerald-800 text-xs px-2 py-0.5 rounded border border-emerald-200 font-medium">{loc}</span>
+                                ))}
+                              </div>
+                            )}
+                            {c.unit_nopol_list && c.unit_nopol_list.length > 0 && (
+                              <div className="flex gap-1.5 flex-wrap items-center">
+                                <span className="text-xs font-semibold text-muted-foreground">Armada:</span>
+                                {c.unit_nopol_list.map((np, idx) => (
+                                  <span key={idx} className="bg-muted text-xs font-mono px-2 py-0.5 rounded border">{np}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="flex gap-2">
                           <Button variant="ghost" size="icon" onClick={() => editContract(c)}><Edit className="w-4 h-4 text-blue-500" /></Button>

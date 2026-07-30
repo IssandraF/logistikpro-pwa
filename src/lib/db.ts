@@ -134,6 +134,7 @@ export interface DailyContract {
   pihak_kedua_hp?: string;
   proyek_id: number;
   lokasi_proyek_nama?: string;
+  lokasi_proyek_list?: string[];
   tarif_harian: number; // e.g. 1600000
   pph_persen: number; // e.g. 2
   bank_nama?: string; // e.g. Mandiri
