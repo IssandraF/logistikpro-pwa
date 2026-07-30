@@ -33,6 +33,88 @@ export default function Trips() {
   const lokasiProyeks = useLiveQuery(() => db.lokasiProyeks.where('isDeleted').equals(0).toArray());
   const invoices = useLiveQuery(() => db.invoices.toArray());
 
+  // Timesheet DT Harian Queries & State
+  const dailyContracts = useLiveQuery(() => db.dailyContracts.where('isDeleted').equals(0).toArray());
+  const dailyTimesheets = useLiveQuery(() => db.dailyTimesheets.where('isDeleted').equals(0).reverse().sortBy('tanggal'));
+  
+  const [dtContractId, setDtContractId] = useState('');
+  const [dtPlatNomor, setDtPlatNomor] = useState('');
+  const [dtTanggal, setDtTanggal] = useState('');
+  const [dtLokasiDetail, setDtLokasiDetail] = useState('');
+  const [dtKegiatan, setDtKegiatan] = useState('');
+  const [dtStatusKerja, setDtStatusKerja] = useState<'kerja' | 'standby' | 'breakdown' | 'hujan'>('kerja');
+  const [dtJumlahHari, setDtJumlahHari] = useState('1');
+  const [dtOperatorNama, setDtOperatorNama] = useState('');
+  const [dtPengawasNama, setDtPengawasNama] = useState('');
+  const [dtBuktiFoto, setDtBuktiFoto] = useState<string | null>(null);
+  const [editingTsId, setEditingTsId] = useState<number | null>(null);
+
+  const saveDailyTimesheet = async () => {
+    if (!dtContractId || !dtPlatNomor || !dtTanggal || !dtLokasiDetail) {
+      return toast.error('Pilih Kontrak, Plat Nomor, Tanggal, dan Lokasi Detail/STA wajib diisi');
+    }
+
+    const tsData = {
+      daily_contract_id: Number(dtContractId),
+      plat_nomor: dtPlatNomor.trim().toUpperCase(),
+      tanggal: new Date(dtTanggal),
+      lokasi_detail: dtLokasiDetail.trim(),
+      kegiatan: dtKegiatan.trim(),
+      status_kerja: dtStatusKerja,
+      jumlah_hari: Number(dtJumlahHari) || 1,
+      operator_nama: dtOperatorNama.trim(),
+      pengawas_nama: dtPengawasNama.trim(),
+      bukti_timesheet: dtBuktiFoto || undefined,
+      invoice_id: null,
+      createdAt: new Date(),
+      isDeleted: 0
+    };
+
+    if (editingTsId) {
+      await db.dailyTimesheets.update(editingTsId, tsData);
+      toast.success('Timesheet Harian berhasil diperbarui');
+    } else {
+      await db.dailyTimesheets.add(tsData);
+      toast.success('Timesheet Harian berhasil ditambahkan');
+    }
+    cancelEditTs();
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const editTs = (t: any) => {
+    setEditingTsId(t.id);
+    setDtContractId(String(t.daily_contract_id));
+    setDtPlatNomor(t.plat_nomor || '');
+    setDtTanggal(format(new Date(t.tanggal), 'yyyy-MM-dd'));
+    setDtLokasiDetail(t.lokasi_detail || '');
+    setDtKegiatan(t.kegiatan || '');
+    setDtStatusKerja(t.status_kerja || 'kerja');
+    setDtJumlahHari(String(t.jumlah_hari || 1));
+    setDtOperatorNama(t.operator_nama || '');
+    setDtPengawasNama(t.pengawas_nama || '');
+    setDtBuktiFoto(t.bukti_timesheet || null);
+  };
+
+  const cancelEditTs = () => {
+    setEditingTsId(null);
+    setDtContractId('');
+    setDtPlatNomor('');
+    setDtTanggal('');
+    setDtLokasiDetail('');
+    setDtKegiatan('');
+    setDtStatusKerja('kerja');
+    setDtJumlahHari('1');
+    setDtOperatorNama('');
+    setDtPengawasNama('');
+    setDtBuktiFoto(null);
+  };
+
+  const deleteTs = async (id: number) => {
+    if (!confirm('Hapus entri Timesheet ini?')) return;
+    await db.dailyTimesheets.update(id, { isDeleted: 1 });
+    toast.success('Timesheet Dihapus');
+  };
+
   // Form State (Single)
   const [grupId, setGrupId] = useState('');
   const [platNomor, setPlatNomor] = useState('');
@@ -548,10 +630,11 @@ export default function Trips() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="print:hidden">
-        <TabsList className="mb-4">
-          <TabsTrigger value="data">Data Trip</TabsTrigger>
-          <TabsTrigger value="single">Input Trip</TabsTrigger>
-          <TabsTrigger value="mass">Mass Input</TabsTrigger>
+        <TabsList className="mb-4 flex-wrap h-auto gap-1">
+          <TabsTrigger value="data">Data Trip (Ritase)</TabsTrigger>
+          <TabsTrigger value="timesheet-dt">Timesheet DT Harian</TabsTrigger>
+          <TabsTrigger value="single">Input Trip Ritase</TabsTrigger>
+          <TabsTrigger value="mass">Mass Input Ritase</TabsTrigger>
         </TabsList>
 
         {/* TAB DATA TRIP */}
@@ -923,6 +1006,262 @@ export default function Trips() {
                   Simpan {massRows.length} Trip
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="timesheet-dt">
+          <Card className="mb-6">
+            <CardHeader><CardTitle>{editingTsId ? 'Edit Entri Timesheet Harian' : 'Input Absensi / Timesheet Harian Unit DT'}</CardTitle></CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div className="space-y-2">
+                  <Label>Pilih Kontrak DT *</Label>
+                  <Select value={dtContractId} onValueChange={(val) => {
+                    setDtContractId(val);
+                    const selectedC = dailyContracts?.find(c => String(c.id) === val);
+                    if (selectedC && selectedC.unit_nopol_list && selectedC.unit_nopol_list.length > 0) {
+                      setDtPlatNomor(selectedC.unit_nopol_list[0]);
+                    }
+                    if (selectedC && selectedC.lokasi_proyek_nama && !dtLokasiDetail) {
+                      setDtLokasiDetail(selectedC.lokasi_proyek_nama);
+                    }
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Pilih Kontrak" /></SelectTrigger>
+                    <SelectContent>
+                      {dailyContracts?.map(c => {
+                        const pr = proyeks?.find(p => p.id === c.proyek_id);
+                        return (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            {c.nomor_kontrak} - {pr?.nama_proyek || 'Proyek'} ({c.pihak_kedua_nama})
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Plat Nomor Kendaraan *</Label>
+                  <Input 
+                    value={dtPlatNomor} 
+                    onChange={e => setDtPlatNomor(e.target.value.toUpperCase())} 
+                    placeholder="BA 8826 QY" 
+                    className="uppercase"
+                  />
+                  {dailyContracts?.find(c => String(c.id) === dtContractId)?.unit_nopol_list?.length ? (
+                    <div className="flex gap-1 flex-wrap mt-1">
+                      {dailyContracts?.find(c => String(c.id) === dtContractId)?.unit_nopol_list?.map((np, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setDtPlatNomor(np)}
+                          className="text-[11px] bg-muted hover:bg-primary/20 px-2 py-0.5 rounded border"
+                        >
+                          {np}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Tanggal Kerja *</Label>
+                  <Input type="date" value={dtTanggal} onChange={e => setDtTanggal(e.target.value)} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Jumlah Hari *</Label>
+                  <Select value={dtJumlahHari} onValueChange={setDtJumlahHari}>
+                    <SelectTrigger><SelectValue placeholder="Jumlah Hari" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 Hari Full</SelectItem>
+                      <SelectItem value="0.5">0.5 Hari (Setengah Hari)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Lokasi Pemakaian / STA Detail *</Label>
+                  <Input 
+                    value={dtLokasiDetail} 
+                    onChange={e => setDtLokasiDetail(e.target.value)} 
+                    placeholder="Contoh: STA 194 Pekanbaru" 
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Jenis Kegiatan / Pekerjaan</Label>
+                  <Input 
+                    value={dtKegiatan} 
+                    onChange={e => setDtKegiatan(e.target.value)} 
+                    placeholder="Contoh: Timbunan Subgrade / Transport Base" 
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Status Operasional Unit *</Label>
+                  <Select value={dtStatusKerja} onValueChange={(val: any) => setDtStatusKerja(val)}>
+                    <SelectTrigger><SelectValue placeholder="Status Kerja" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="kerja">Kerja (Aktif)</SelectItem>
+                      <SelectItem value="standby">Standby</SelectItem>
+                      <SelectItem value="breakdown">Breakdown (Rusak)</SelectItem>
+                      <SelectItem value="hujan">Hujan / Halted</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Nama Operator & Pengawas Lapangan</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input value={dtOperatorNama} onChange={e => setDtOperatorNama(e.target.value)} placeholder="Operator" />
+                    <Input value={dtPengawasNama} onChange={e => setDtPengawasNama(e.target.value)} placeholder="Pengawas" />
+                  </div>
+                </div>
+
+                <div className="md:col-span-4 space-y-2">
+                  <Label>Upload Foto Timesheet Lapangan (Bertanda Tangan)</Label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try {
+                            const compressed = await compressImage(file);
+                            setDtBuktiFoto(compressed);
+                            toast.success('Foto Timesheet berhasil diunggah');
+                          } catch {
+                            toast.error('Gagal mengolah foto');
+                          }
+                        }
+                      }}
+                      className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                    />
+                    {dtBuktiFoto && (
+                      <div className="relative group">
+                        <img src={dtBuktiFoto} alt="Bukti Timesheet" className="w-12 h-12 object-cover rounded border" />
+                        <button
+                          type="button"
+                          onClick={() => setDtBuktiFoto(null)}
+                          className="absolute -top-1 -right-1 bg-destructive text-white rounded-full p-0.5 text-xs"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button onClick={saveDailyTimesheet} className="bg-emerald-600 hover:bg-emerald-700">
+                  {editingTsId ? 'Simpan Perubahan Timesheet' : '+ Tambah Timesheet Harian'}
+                </Button>
+                {editingTsId && (
+                  <Button variant="outline" onClick={cancelEditTs}>Batal</Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Daftar Riwayat Timesheet DT Harian</CardTitle></CardHeader>
+            <CardContent>
+              {dailyTimesheets?.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">Belum ada data Timesheet DT Harian.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-muted text-muted-foreground uppercase text-[11px]">
+                      <tr>
+                        <th className="p-3">Tanggal</th>
+                        <th className="p-3">Kontrak & Proyek</th>
+                        <th className="p-3">Nopol</th>
+                        <th className="p-3">Lokasi / STA</th>
+                        <th className="p-3">Kegiatan</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3">Jumlah</th>
+                        <th className="p-3">Operator / Pengawas</th>
+                        <th className="p-3 text-center">Foto</th>
+                        <th className="p-3 text-center">Status Invoice</th>
+                        <th className="p-3 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {dailyTimesheets?.map(t => {
+                        const contract = dailyContracts?.find(c => c.id === t.daily_contract_id);
+                        const proyek = proyeks?.find(p => p.id === contract?.proyek_id);
+                        return (
+                          <tr key={t.id} className="hover:bg-muted/30">
+                            <td className="p-3 font-medium whitespace-nowrap">
+                              {format(new Date(t.tanggal), 'dd/MM/yyyy')}
+                            </td>
+                            <td className="p-3">
+                              <p className="font-semibold">{contract?.nomor_kontrak || '-'}</p>
+                              <p className="text-xs text-muted-foreground">{proyek?.nama_proyek || 'Proyek'}</p>
+                            </td>
+                            <td className="p-3">
+                              <span className="font-mono font-bold bg-muted px-2 py-0.5 rounded border">{t.plat_nomor}</span>
+                            </td>
+                            <td className="p-3 font-medium text-emerald-700 dark:text-emerald-400">
+                              {t.lokasi_detail}
+                            </td>
+                            <td className="p-3">{t.kegiatan || '-'}</td>
+                            <td className="p-3">
+                              <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
+                                t.status_kerja === 'kerja' ? 'bg-emerald-100 text-emerald-800' :
+                                t.status_kerja === 'standby' ? 'bg-amber-100 text-amber-800' :
+                                t.status_kerja === 'breakdown' ? 'bg-rose-100 text-rose-800' :
+                                'bg-sky-100 text-sky-800'
+                              }`}>
+                                {t.status_kerja.toUpperCase()}
+                              </span>
+                            </td>
+                            <td className="p-3 font-semibold">{t.jumlah_hari} Hari</td>
+                            <td className="p-3 text-xs">
+                              {t.operator_nama && <p>Op: {t.operator_nama}</p>}
+                              {t.pengawas_nama && <p className="text-muted-foreground">Spv: {t.pengawas_nama}</p>}
+                            </td>
+                            <td className="p-3 text-center">
+                              {t.bukti_timesheet ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedPhotoForView({ url: t.bukti_timesheet! })}
+                                  className="text-blue-500 hover:underline flex items-center justify-center gap-1 mx-auto text-xs"
+                                >
+                                  <ImageIcon className="w-4 h-4" /> Lihat
+                                </button>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">-</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-center">
+                              {t.invoice_id ? (
+                                <span className="bg-blue-100 text-blue-800 text-[11px] px-2 py-0.5 rounded-full font-medium">Invoiced</span>
+                              ) : (
+                                <span className="bg-amber-50 text-amber-700 text-[11px] px-2 py-0.5 rounded-full border border-amber-200">Belum Penagihan</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-right">
+                              <div className="flex justify-end gap-1">
+                                <Button variant="ghost" size="icon" onClick={() => editTs(t)}>
+                                  <Edit className="w-4 h-4 text-blue-500" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => deleteTs(t.id!)}>
+                                  <Trash2 className="w-4 h-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

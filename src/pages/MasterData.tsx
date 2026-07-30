@@ -268,6 +268,119 @@ export default function MasterData() {
     setNamaOwner(''); setBankName(''); setBankAcc(''); setBankAccName('');
   };
 
+  // Kontrak DT Harian
+  const dailyContracts = useLiveQuery(() => db.dailyContracts.where('isDeleted').equals(0).toArray());
+  const [nomorKontrak, setNomorKontrak] = useState('');
+  const [pihak1Nama, setPihak1Nama] = useState('');
+  const [pihak1Nik, setPihak1Nik] = useState('');
+  const [pihak1Alamat, setPihak1Alamat] = useState('');
+  const [pihak1Hp, setPihak1Hp] = useState('');
+  const [pihak2Nama, setPihak2Nama] = useState('');
+  const [pihak2Nik, setPihak2Nik] = useState('');
+  const [pihak2Alamat, setPihak2Alamat] = useState('');
+  const [pihak2Hp, setPihak2Hp] = useState('');
+  const [contractProyekId, setContractProyekId] = useState('');
+  const [lokasiProyekNama, setLokasiProyekNama] = useState('');
+  const [tarifHarian, setTarifHarian] = useState('1600000');
+  const [pphPersen, setPphPersen] = useState('2');
+  const [dtBankNama, setDtBankNama] = useState('Mandiri');
+  const [dtBankRekening, setDtBankRekening] = useState('1080030788005');
+  const [dtBankAtasNama, setDtBankAtasNama] = useState('Irma Fitriani Dalimunte');
+  const [unitNopolInput, setUnitNopolInput] = useState('');
+  const [editingContractId, setEditingContractId] = useState<number | null>(null);
+
+  const saveContract = async () => {
+    if (!nomorKontrak || !pihak1Nama || !pihak2Nama || !contractProyekId || !tarifHarian) {
+      return toast.error('Nomor Kontrak, Pihak 1, Pihak 2, Proyek, dan Tarif Harian wajib diisi');
+    }
+
+    const nopolList = unitNopolInput
+      .split(',')
+      .map(s => s.trim().toUpperCase())
+      .filter(Boolean);
+
+    const contractData = {
+      nomor_kontrak: nomorKontrak.trim(),
+      pihak_pertama_nama: pihak1Nama.trim(),
+      pihak_pertama_nik: pihak1Nik.trim(),
+      pihak_pertama_alamat: pihak1Alamat.trim(),
+      pihak_pertama_hp: pihak1Hp.trim(),
+      pihak_kedua_nama: pihak2Nama.trim(),
+      pihak_kedua_nik: pihak2Nik.trim(),
+      pihak_kedua_alamat: pihak2Alamat.trim(),
+      pihak_kedua_hp: pihak2Hp.trim(),
+      proyek_id: Number(contractProyekId),
+      lokasi_proyek_nama: lokasiProyekNama.trim(),
+      tarif_harian: Number(tarifHarian) || 0,
+      pph_persen: Number(pphPersen) || 0,
+      bank_nama: dtBankNama.trim(),
+      bank_rekening: dtBankRekening.trim(),
+      bank_atas_nama: dtBankAtasNama.trim(),
+      unit_nopol_list: nopolList,
+      status: 'aktif' as const,
+      createdAt: new Date(),
+      isDeleted: 0,
+    };
+
+    if (editingContractId) {
+      await db.dailyContracts.update(editingContractId, contractData);
+      toast.success('Kontrak DT Harian berhasil diperbarui');
+    } else {
+      await db.dailyContracts.add(contractData);
+      toast.success('Kontrak DT Harian berhasil ditambahkan');
+    }
+    cancelEditContract();
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const editContract = (c: any) => {
+    setEditingContractId(c.id);
+    setNomorKontrak(c.nomor_kontrak || '');
+    setPihak1Nama(c.pihak_pertama_nama || '');
+    setPihak1Nik(c.pihak_pertama_nik || '');
+    setPihak1Alamat(c.pihak_pertama_alamat || '');
+    setPihak1Hp(c.pihak_pertama_hp || '');
+    setPihak2Nama(c.pihak_kedua_nama || '');
+    setPihak2Nik(c.pihak_kedua_nik || '');
+    setPihak2Alamat(c.pihak_kedua_alamat || '');
+    setPihak2Hp(c.pihak_kedua_hp || '');
+    setContractProyekId(c.proyek_id ? String(c.proyek_id) : '');
+    setLokasiProyekNama(c.lokasi_proyek_nama || '');
+    setTarifHarian(String(c.tarif_harian || 1600000));
+    setPphPersen(String(c.pph_persen ?? 2));
+    setDtBankNama(c.bank_nama || '');
+    setDtBankRekening(c.bank_rekening || '');
+    setDtBankAtasNama(c.bank_atas_nama || '');
+    setUnitNopolInput(Array.isArray(c.unit_nopol_list) ? c.unit_nopol_list.join(', ') : '');
+  };
+
+  const cancelEditContract = () => {
+    setEditingContractId(null);
+    setNomorKontrak('');
+    setPihak1Nama('');
+    setPihak1Nik('');
+    setPihak1Alamat('');
+    setPihak1Hp('');
+    setPihak2Nama('');
+    setPihak2Nik('');
+    setPihak2Alamat('');
+    setPihak2Hp('');
+    setContractProyekId('');
+    setLokasiProyekNama('');
+    setTarifHarian('1600000');
+    setPphPersen('2');
+    setDtBankNama('Mandiri');
+    setDtBankRekening('1080030788005');
+    setDtBankAtasNama('Irma Fitriani Dalimunte');
+    setUnitNopolInput('');
+  };
+
+  const deleteContract = async (id: number) => {
+    if (!confirm('Hapus Kontrak DT Harian ini?')) return;
+    await db.dailyContracts.update(id, { isDeleted: 1 });
+    toast.success('Kontrak Dihapus');
+  };
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">Data Master</h1>
@@ -276,6 +389,7 @@ export default function MasterData() {
           <TabsTrigger value="grup-mobil">Grup Mobil</TabsTrigger>
           <TabsTrigger value="perusahaan">Perusahaan (Pengirim)</TabsTrigger>
           <TabsTrigger value="proyek">Proyek</TabsTrigger>
+          <TabsTrigger value="kontrak-dt">Kontrak DT Harian</TabsTrigger>
           <TabsTrigger value="rute-proyek">Rute Tujuan</TabsTrigger>
           <TabsTrigger value="lokasi-kuari">Lokasi Kuari</TabsTrigger>
           <TabsTrigger value="jenis-jasa">Jenis Pengiriman (Jasa)</TabsTrigger>
@@ -550,6 +664,119 @@ export default function MasterData() {
                   </li>
                 ))}
               </ul>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="kontrak-dt">
+          <Card>
+            <CardHeader><CardTitle>Master Kontrak Sewa DT Harian</CardTitle></CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="space-y-2">
+                  <Label>Nomor Kontrak *</Label>
+                  <Input value={nomorKontrak} onChange={e => setNomorKontrak(e.target.value)} placeholder="001/07/DT/2026" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Pilih Proyek *</Label>
+                  <Select value={contractProyekId} onValueChange={setContractProyekId}>
+                    <SelectTrigger><SelectValue placeholder="Pilih Proyek" /></SelectTrigger>
+                    <SelectContent>
+                      {proyeks?.map(p => (
+                        <SelectItem key={p.id} value={String(p.id)}>{p.nama_proyek}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Lokasi Proyek / Detail STA</Label>
+                  <Input value={lokasiProyekNama} onChange={e => setLokasiProyekNama(e.target.value)} placeholder="STA 194 Pekanbaru" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Pihak 1 (Pemilik Alat / Transporter) *</Label>
+                  <Input value={pihak1Nama} onChange={e => setPihak1Nama(e.target.value)} placeholder="Novid Chandra" />
+                </div>
+                <div className="space-y-2">
+                  <Label>No. HP / Kontak Pihak 1</Label>
+                  <Input value={pihak1Hp} onChange={e => setPihak1Hp(e.target.value)} placeholder="0822 6892 9030" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Pihak 2 (Penyewa / Proyek) *</Label>
+                  <Input value={pihak2Nama} onChange={e => setPihak2Nama(e.target.value)} placeholder="Ridzat Ali Murphi" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Tarif Sewa Harian (Rp/Hari) *</Label>
+                  <Input type="number" value={tarifHarian} onChange={e => setTarifHarian(e.target.value)} placeholder="1600000" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Persentase PPh (%)</Label>
+                  <Input type="number" value={pphPersen} onChange={e => setPphPersen(e.target.value)} placeholder="2" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Daftar Plat Nomor Mobil (Pisah Koma)</Label>
+                  <Input value={unitNopolInput} onChange={e => setUnitNopolInput(e.target.value)} placeholder="BA 8826 QY, B 9927 PYT" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Bank Pembayaran</Label>
+                  <Input value={dtBankNama} onChange={e => setDtBankNama(e.target.value)} placeholder="Mandiri" />
+                </div>
+                <div className="space-y-2">
+                  <Label>No. Rekening Bank</Label>
+                  <Input value={dtBankRekening} onChange={e => setDtBankRekening(e.target.value)} placeholder="1080030788005" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Atas Nama Rekening</Label>
+                  <Input value={dtBankAtasNama} onChange={e => setDtBankAtasNama(e.target.value)} placeholder="Irma Fitriani Dalimunte" />
+                </div>
+
+                <div className="md:col-span-3 flex gap-2">
+                  <Button onClick={saveContract} className="flex-1">
+                    {editingContractId ? <><Save className="w-4 h-4 mr-2"/> Simpan Perubahan Kontrak</> : <><Plus className="w-4 h-4 mr-2"/> Tambah Kontrak DT Harian</>}
+                  </Button>
+                  {editingContractId && <Button variant="outline" onClick={cancelEditContract}>Batal</Button>}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold text-lg">Daftar Kontrak DT Harian</h3>
+                {dailyContracts?.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Belum ada kontrak DT Harian.</p>
+                ) : (
+                  dailyContracts?.map(c => {
+                    const pr = proyeks?.find(p => p.id === c.proyek_id);
+                    return (
+                      <div key={c.id} className="p-4 border rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-lg">{c.nomor_kontrak}</span>
+                            <span className="bg-primary/10 text-primary text-xs px-2 py-0.5 rounded font-medium">{pr?.nama_proyek || 'Proyek'}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Pihak 1: <strong className="text-foreground">{c.pihak_pertama_nama}</strong> | Pihak 2: <strong className="text-foreground">{c.pihak_kedua_nama}</strong>
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Tarif: <span className="font-semibold text-emerald-600">Rp {(c.tarif_harian || 0).toLocaleString('id-ID')}/Hari</span> | PPh: {c.pph_persen || 0}% | Bank: {c.bank_nama} {c.bank_rekening} a.n {c.bank_atas_nama}
+                          </p>
+                          {c.unit_nopol_list && c.unit_nopol_list.length > 0 && (
+                            <div className="flex gap-1.5 flex-wrap mt-2">
+                              {c.unit_nopol_list.map((np, idx) => (
+                                <span key={idx} className="bg-muted text-xs font-mono px-2 py-0.5 rounded border">{np}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => editContract(c)}><Edit className="w-4 h-4 text-blue-500" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => deleteContract(c.id!)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

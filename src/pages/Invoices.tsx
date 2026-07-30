@@ -13,6 +13,7 @@ import { Eye, FileText, Printer, FileDown, CheckSquare, Image as ImageIcon, Tras
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import PrintInvoice from '@/components/PrintInvoice';
+import PrintDailyInvoice from '@/components/PrintDailyInvoice';
 import { printWithTitle } from '@/lib/print-utils';
 import { exportInvoiceExcel } from '@/lib/excel-utils';
 import { exportSmartInvoices, importSmartInvoices } from '@/lib/sync-utils';
@@ -45,6 +46,17 @@ export default function Invoices() {
   const lokasiProyeks = useLiveQuery(() => db.lokasiProyeks.toArray());
   const owners = useLiveQuery(() => db.owners.where('isDeleted').equals(0).toArray());
 
+  // DT Harian Queries & State
+  const dailyContracts = useLiveQuery(() => db.dailyContracts.where('isDeleted').equals(0).toArray());
+  const pendingDailyTimesheets = useLiveQuery(() => db.dailyTimesheets.filter(t => !t.invoice_id && t.isDeleted === 0).toArray());
+  
+  const [dtInvNomor, setDtInvNomor] = useState('');
+  const [dtInvTanggal, setDtInvTanggal] = useState('');
+  const [dtContractId, setDtContractId] = useState('');
+  const [dtFilterMulai, setDtFilterMulai] = useState('');
+  const [dtFilterAkhir, setDtFilterAkhir] = useState('');
+  const [dtPphAktif, setDtPphAktif] = useState(true);
+
   const [nomorInvoice, setNomorInvoice] = useState('');
   const [tglInvoice, setTglInvoice] = useState('');
   const [proyekId, setProyekId] = useState('');
@@ -59,12 +71,92 @@ export default function Invoices() {
   const [invoiceToPrint, setInvoiceToPrint] = useState<any>(null);
   const [includePhotos, setIncludePhotos] = useState(false);
   const tripsForPrint = useLiveQuery(
-    () => invoiceToPrint ? db.trips.where('invoice_id').equals(invoiceToPrint.id).toArray() : Promise.resolve([]),
+    () => invoiceToPrint && invoiceToPrint.tipe_invoice !== 'harian' ? db.trips.where('invoice_id').equals(invoiceToPrint.id).toArray() : Promise.resolve([]),
+    [invoiceToPrint]
+  );
+  const timesheetsForPrint = useLiveQuery(
+    () => invoiceToPrint && invoiceToPrint.tipe_invoice === 'harian' ? db.dailyTimesheets.where('invoice_id').equals(invoiceToPrint.id).toArray() : Promise.resolve([]),
     [invoiceToPrint]
   );
   
   const [paperSize, setPaperSize] = useState('A4 portrait');
   const [printScale, setPrintScale] = useState(100);
+
+  // Memoized Daily Invoice Calculations
+  const filteredDailyTimesheets = useMemo(() => {
+    if (!dtContractId || !pendingDailyTimesheets) return [];
+    const cId = Number(dtContractId);
+    let list = pendingDailyTimesheets.filter(t => t.daily_contract_id === cId);
+    if (dtFilterMulai) {
+      const start = new Date(dtFilterMulai);
+      list = list.filter(t => new Date(t.tanggal) >= start);
+    }
+    if (dtFilterAkhir) {
+      const end = new Date(dtFilterAkhir);
+      end.setHours(23, 59, 59, 999);
+      list = list.filter(t => new Date(t.tanggal) <= end);
+    }
+    return list;
+  }, [dtContractId, pendingDailyTimesheets, dtFilterMulai, dtFilterAkhir]);
+
+  const selectedDailyContract = useMemo(() => {
+    return dailyContracts?.find(c => String(c.id) === dtContractId);
+  }, [dailyContracts, dtContractId]);
+
+  const dtTotalHari = useMemo(() => {
+    return filteredDailyTimesheets.reduce((s, t) => s + (t.jumlah_hari || 1), 0);
+  }, [filteredDailyTimesheets]);
+
+  const dtTarifHarian = selectedDailyContract?.tarif_harian || 1600000;
+  const dtTotalKotor = dtTotalHari * dtTarifHarian;
+  const dtPphPersen = selectedDailyContract?.pph_persen ?? 2;
+  const dtTotalPph = dtPphAktif ? (dtTotalKotor * (dtPphPersen / 100)) : 0;
+  const dtTotalNett = dtTotalKotor - dtTotalPph;
+
+  const handleCreateDailyInvoice = async () => {
+    if (!dtInvNomor || !dtInvTanggal || !dtContractId) {
+      return toast.error('Nomor Invoice, Tanggal, dan Pilih Kontrak wajib diisi');
+    }
+    if (filteredDailyTimesheets.length === 0) {
+      return toast.error('Belum ada timesheet harian yang tersedia pada rentang tanggal ini');
+    }
+
+    const contract = selectedDailyContract;
+    const newInvoice: import('@/lib/db').Invoice = {
+      nomor_invoice: dtInvNomor.trim(),
+      tanggal_invoice: new Date(dtInvTanggal),
+      proyek_id: contract?.proyek_id || 0,
+      owner_id: 1,
+      total_kubikasi: 0,
+      total_harga_kotor: dtTotalKotor,
+      is_potong_material: 0,
+      total_potongan_material: 0,
+      total_harga_bersih: dtTotalNett,
+      status: 'draft',
+      tipe_invoice: 'harian',
+      daily_contract_id: contract?.id,
+      pph_persen: dtPphAktif ? dtPphPersen : 0,
+      total_pph: dtTotalPph,
+      rekening_bank: `${contract?.bank_nama || 'Mandiri'} ${contract?.bank_rekening || '1080030788005'} a.n ${contract?.bank_atas_nama || 'Irma Fitriani Dalimunte'}`,
+      kepada_custom: contract?.pihak_kedua_nama,
+      nama_ttd: contract?.pihak_pertama_nama,
+      createdAt: new Date(),
+    };
+
+    const invId = await db.invoices.add(newInvoice);
+
+    for (const ts of filteredDailyTimesheets) {
+      await db.dailyTimesheets.update(ts.id!, { invoice_id: invId });
+    }
+
+    toast.success('Invoice Penagihan DT Harian berhasil dibuat!');
+    setActiveTab('data');
+    setDtInvNomor('');
+    setDtInvTanggal('');
+    setDtContractId('');
+    setDtFilterMulai('');
+    setDtFilterAkhir('');
+  };
   
 
   // Filter Tanggal Trip
@@ -259,17 +351,24 @@ export default function Invoices() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleDeleteInvoice = async (inv: any) => {
-    if (confirm(`Yakin HAPUS Invoice ${inv.nomor_invoice}? Seluruh trip di dalamnya akan kembali menjadi PENDING.`)) {
+    if (confirm(`Yakin HAPUS Invoice ${inv.nomor_invoice}? Seluruh item di dalamnya akan kembali menjadi PENDING.`)) {
       try {
-        const trips = await db.trips.where('invoice_id').equals(inv.id).toArray();
-        const tripIds = trips.map(t => t.id!);
-        
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await db.trips.where('id').anyOf(tripIds).modify((t: any) => { t.invoice_id = null; });
-        await db.invoiceQuarryPrices.where('invoice_id').equals(inv.id).delete();
+        if (inv.tipe_invoice === 'harian') {
+          const timesheets = await db.dailyTimesheets.where('invoice_id').equals(inv.id).toArray();
+          for (const ts of timesheets) {
+            await db.dailyTimesheets.update(ts.id!, { invoice_id: null });
+          }
+        } else {
+          const trips = await db.trips.where('invoice_id').equals(inv.id).toArray();
+          const tripIds = trips.map(t => t.id!);
+          
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await db.trips.where('id').anyOf(tripIds).modify((t: any) => { t.invoice_id = null; });
+          await db.invoiceQuarryPrices.where('invoice_id').equals(inv.id).delete();
+        }
         await db.invoices.delete(inv.id);
 
-        toast.success('Invoice dihapus & Trip di-rollback!');
+        toast.success('Invoice dihapus & Data di-rollback!');
       } catch {
         toast.error('Gagal menghapus invoice');
       }
@@ -363,9 +462,10 @@ export default function Invoices() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="print:hidden">
-        <TabsList className="mb-4">
+        <TabsList className="mb-4 flex-wrap h-auto gap-1">
           <TabsTrigger value="data">Data Invoice</TabsTrigger>
-          <TabsTrigger value="create">{editInvId ? 'Edit Invoice' : 'Buat Invoice Baru'}</TabsTrigger>
+          <TabsTrigger value="create">{editInvId ? 'Edit Invoice' : 'Buat Invoice Ritase'}</TabsTrigger>
+          <TabsTrigger value="create-daily">Buat Invoice DT Harian</TabsTrigger>
         </TabsList>
 
         <TabsContent value="data">
@@ -386,41 +486,59 @@ export default function Invoices() {
                   <thead className="bg-muted border-b">
                     <tr>
                       <th className="p-3">Nomor</th>
+                      <th className="p-3">Tipe</th>
                       <th className="p-3">Tanggal</th>
                       <th className="p-3">Proyek</th>
-                      <th className="p-3">Kubikasi</th>
+                      <th className="p-3">Volume / Tipe</th>
                       <th className="p-3">Harga Bersih</th>
                       <th className="p-3">Aksi</th>
                     </tr>
                   </thead>
                   <tbody>
                     {invoices?.map(inv => (
-                      <tr key={inv.id} className="border-b">
-                        <td className="p-3 font-medium">{inv.nomor_invoice}</td>
+                      <tr key={inv.id} className="border-b hover:bg-muted/30">
+                        <td className="p-3 font-bold">{inv.nomor_invoice}</td>
+                        <td className="p-3">
+                          {inv.tipe_invoice === 'harian' ? (
+                            <span className="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded-full font-semibold">DT Harian</span>
+                          ) : (
+                            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-semibold">Ritase</span>
+                          )}
+                        </td>
                         <td className="p-3">{format(new Date(inv.tanggal_invoice), 'dd/MM/yyyy')}</td>
-                        <td className="p-3">{proyeks?.find(p => p.id === inv.proyek_id)?.nama_proyek}</td>
-                        <td className="p-3">{inv.total_kubikasi}</td>
-                        <td className="p-3 font-semibold text-primary">Rp {inv.total_harga_bersih.toLocaleString('id-ID')}</td>
-                        <td className="p-3 flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => exportExcelSingle(inv)}>
-                            <FileDown className="w-4 h-4 text-green-600" />
-                          </Button>
+                        <td className="p-3 font-medium">{proyeks?.find(p => p.id === inv.proyek_id)?.nama_proyek || 'Proyek'}</td>
+                        <td className="p-3">
+                          {inv.tipe_invoice === 'harian' ? (
+                            <span className="text-xs text-muted-foreground">Sewa Harian</span>
+                          ) : (
+                            <span>{inv.total_kubikasi} m³</span>
+                          )}
+                        </td>
+                        <td className="p-3 font-semibold text-emerald-600 dark:text-emerald-400">Rp {inv.total_harga_bersih.toLocaleString('id-ID')}</td>
+                        <td className="p-3 flex gap-1.5">
+                          {inv.tipe_invoice !== 'harian' && (
+                            <Button variant="outline" size="sm" onClick={() => exportExcelSingle(inv)}>
+                              <FileDown className="w-4 h-4 text-green-600" />
+                            </Button>
+                          )}
                           <Button variant="outline" size="sm" onClick={() => handlePreviewClick(inv)}>
                             <Eye className="w-4 h-4 text-purple-600" />
                           </Button>
                           <Button variant="outline" size="sm" onClick={() => handlePrintClick(inv)}>
                             <Printer className="w-4 h-4 text-blue-600" />
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleEditInvoiceFull(inv)}>
-                            <Edit className="w-4 h-4 text-orange-600" />
-                          </Button>
+                          {inv.tipe_invoice !== 'harian' && (
+                            <Button variant="outline" size="sm" onClick={() => handleEditInvoiceFull(inv)}>
+                              <Edit className="w-4 h-4 text-orange-600" />
+                            </Button>
+                          )}
                           <Button variant="outline" size="sm" onClick={() => handleDeleteInvoice(inv)}>
                             <Trash2 className="w-4 h-4 text-destructive" />
                           </Button>
                         </td>
                       </tr>
                     ))}
-                    {invoices?.length === 0 && <tr><td colSpan={6} className="p-4 text-center">Belum ada invoice</td></tr>}
+                    {invoices?.length === 0 && <tr><td colSpan={7} className="p-4 text-center">Belum ada invoice</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -607,6 +725,151 @@ export default function Invoices() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="create-daily">
+          <Card>
+            <CardHeader><CardTitle>Pembuatan Invoice Penagihan DT Harian</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Nomor Invoice *</Label>
+                  <Input 
+                    value={dtInvNomor} 
+                    onChange={e => setDtInvNomor(e.target.value)} 
+                    placeholder="INV/DT/2026/07/001" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tanggal Invoice *</Label>
+                  <Input 
+                    type="date" 
+                    value={dtInvTanggal} 
+                    onChange={e => setDtInvTanggal(e.target.value)} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Pilih Kontrak DT Harian *</Label>
+                  <Select value={dtContractId} onValueChange={setDtContractId}>
+                    <SelectTrigger><SelectValue placeholder="Pilih Kontrak DT" /></SelectTrigger>
+                    <SelectContent>
+                      {dailyContracts?.map(c => {
+                        const pr = proyeks?.find(p => p.id === c.proyek_id);
+                        return (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            {c.nomor_kontrak} - {pr?.nama_proyek || 'Proyek'} ({c.pihak_kedua_nama})
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Mulai Tanggal (Filter Timesheet)</Label>
+                  <Input 
+                    type="date" 
+                    value={dtFilterMulai} 
+                    onChange={e => setDtFilterMulai(e.target.value)} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Sampai Tanggal (Filter Timesheet)</Label>
+                  <Input 
+                    type="date" 
+                    value={dtFilterAkhir} 
+                    onChange={e => setDtFilterAkhir(e.target.value)} 
+                  />
+                </div>
+                <div className="space-y-2 flex items-end pb-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold">
+                    <input 
+                      type="checkbox" 
+                      checked={dtPphAktif} 
+                      onChange={e => setDtPphAktif(e.target.checked)} 
+                      className="accent-primary w-4 h-4"
+                    />
+                    Potong PPh 2% (Pasal 23)
+                  </label>
+                </div>
+              </div>
+
+              {selectedDailyContract && (
+                <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-lg space-y-1 text-sm text-emerald-900">
+                  <p className="font-bold text-base">{selectedDailyContract.nomor_kontrak}</p>
+                  <p>Pihak 1: <strong>{selectedDailyContract.pihak_pertama_nama}</strong> | Pihak 2: <strong>{selectedDailyContract.pihak_kedua_nama}</strong></p>
+                  <p>Tarif Harian: <strong className="text-emerald-700">Rp {(selectedDailyContract.tarif_harian || 0).toLocaleString('id-ID')} / Hari</strong> | Rekening: {selectedDailyContract.bank_nama} {selectedDailyContract.bank_rekening} a.n {selectedDailyContract.bank_atas_nama}</p>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <h3 className="font-bold text-base">Timesheet Harian yang Akan Ditagihkan ({filteredDailyTimesheets.length} Entri)</h3>
+                {filteredDailyTimesheets.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-6 text-center border rounded bg-muted/20">
+                    Tidak ada timesheet harian yang tersedia/belum ditagih pada filter ini.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto border rounded max-h-64 overflow-y-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-muted sticky top-0 border-b">
+                        <tr>
+                          <th className="p-2">Tanggal</th>
+                          <th className="p-2">Nopol</th>
+                          <th className="p-2">Lokasi / STA</th>
+                          <th className="p-2">Kegiatan</th>
+                          <th className="p-2">Status</th>
+                          <th className="p-2">Jumlah Hari</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {filteredDailyTimesheets.map(ts => (
+                          <tr key={ts.id}>
+                            <td className="p-2 font-medium">{format(new Date(ts.tanggal), 'dd/MM/yyyy')}</td>
+                            <td className="p-2 font-mono font-bold">{ts.plat_nomor}</td>
+                            <td className="p-2 font-medium text-emerald-700">{ts.lokasi_detail}</td>
+                            <td className="p-2">{ts.kegiatan || '-'}</td>
+                            <td className="p-2 uppercase">{ts.status_kerja}</td>
+                            <td className="p-2 font-semibold">{ts.jumlah_hari} Hari</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* FINANCIAl SUMMARY */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/40 rounded border">
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Unit-Hari</p>
+                  <p className="text-xl font-bold">{dtTotalHari} Hari</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Subtotal Kotor</p>
+                  <p className="text-xl font-bold">Rp {dtTotalKotor.toLocaleString('id-ID')}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Potongan PPh 2%</p>
+                  <p className="text-xl font-bold text-rose-600">- Rp {dtTotalPph.toLocaleString('id-ID')}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Total Nett Tagihan</p>
+                  <p className="text-xl font-bold text-emerald-600">Rp {dtTotalNett.toLocaleString('id-ID')}</p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button 
+                  onClick={handleCreateDailyInvoice} 
+                  disabled={filteredDailyTimesheets.length === 0}
+                  className="bg-emerald-600 hover:bg-emerald-700 w-full md:w-auto" 
+                  size="lg"
+                >
+                  <FileText className="w-4 h-4 mr-2" /> Simpan Invoice DT Harian Final
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Print Modal */}
@@ -662,23 +925,37 @@ export default function Invoices() {
           </DialogHeader>
           
           <div className="bg-white rounded shadow-sm border border-gray-200">
-             {invoiceToPrint && tripsForPrint && selectedOwner && selectedProyek && (
-                <PrintInvoice
+             {invoiceToPrint && invoiceToPrint.tipe_invoice === 'harian' ? (
+                <PrintDailyInvoice
                   invoice={invoiceToPrint}
-                  trips={tripsForPrint}
-                  owner={selectedOwner}
-                  proyek={selectedProyek}
-                  proyekLokasis={proyekLokasis || []}
-                  lokasiProyeks={lokasiProyeks || []}
-                  lokasiKuaris={lokasiKuaris || []}
-                  jenisJasas={jenisJasas || []}
-                  jenisMaterials={jenisMaterials || []}
+                  contract={dailyContracts?.find(c => c.id === invoiceToPrint.daily_contract_id)}
+                  timesheets={timesheetsForPrint || []}
+                  owner={selectedOwner || undefined}
+                  proyek={selectedProyek || undefined}
                   includePhotos={includePhotos}
                   paperSize={paperSize}
                   printScale={printScale}
                   isPreview={true}
                 />
-              )}
+             ) : (
+                invoiceToPrint && tripsForPrint && selectedOwner && selectedProyek && (
+                  <PrintInvoice
+                    invoice={invoiceToPrint}
+                    trips={tripsForPrint}
+                    owner={selectedOwner}
+                    proyek={selectedProyek}
+                    proyekLokasis={proyekLokasis || []}
+                    lokasiProyeks={lokasiProyeks || []}
+                    lokasiKuaris={lokasiKuaris || []}
+                    jenisJasas={jenisJasas || []}
+                    jenisMaterials={jenisMaterials || []}
+                    includePhotos={includePhotos}
+                    paperSize={paperSize}
+                    printScale={printScale}
+                    isPreview={true}
+                  />
+                )
+             )}
           </div>
           
           <DialogFooter className="mt-4">
@@ -689,21 +966,34 @@ export default function Invoices() {
       </Dialog>
 
       {/* Hidden Print Layout */}
-      {invoiceToPrint && tripsForPrint && selectedOwner && selectedProyek && (
-        <PrintInvoice
+      {invoiceToPrint && invoiceToPrint.tipe_invoice === 'harian' ? (
+        <PrintDailyInvoice
           invoice={invoiceToPrint}
-          trips={tripsForPrint}
-          owner={selectedOwner}
-          proyek={selectedProyek}
-          proyekLokasis={proyekLokasis || []}
-          lokasiProyeks={lokasiProyeks || []}
-          lokasiKuaris={lokasiKuaris || []}
-          jenisJasas={jenisJasas || []}
-          jenisMaterials={jenisMaterials || []}
+          contract={dailyContracts?.find(c => c.id === invoiceToPrint.daily_contract_id)}
+          timesheets={timesheetsForPrint || []}
+          owner={selectedOwner || undefined}
+          proyek={selectedProyek || undefined}
           includePhotos={includePhotos}
           paperSize={paperSize}
           printScale={printScale}
         />
+      ) : (
+        invoiceToPrint && tripsForPrint && selectedOwner && selectedProyek && (
+          <PrintInvoice
+            invoice={invoiceToPrint}
+            trips={tripsForPrint}
+            owner={selectedOwner}
+            proyek={selectedProyek}
+            proyekLokasis={proyekLokasis || []}
+            lokasiProyeks={lokasiProyeks || []}
+            lokasiKuaris={lokasiKuaris || []}
+            jenisJasas={jenisJasas || []}
+            jenisMaterials={jenisMaterials || []}
+            includePhotos={includePhotos}
+            paperSize={paperSize}
+            printScale={printScale}
+          />
+        )
       )}
     </div>
   );

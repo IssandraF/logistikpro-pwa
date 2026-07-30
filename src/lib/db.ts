@@ -113,7 +113,54 @@ export interface Invoice {
   kepada_custom?: string;
   nama_ttd?: string;
   status: 'draft' | 'lunas';
+  tipe_invoice?: 'trip' | 'harian';
+  daily_contract_id?: number | null;
+  total_pph?: number;
+  pph_persen?: number;
+  rekening_bank?: string;
   createdAt: Date;
+}
+
+export interface DailyContract {
+  id?: number;
+  nomor_kontrak: string;
+  pihak_pertama_nama: string;
+  pihak_pertama_nik?: string;
+  pihak_pertama_alamat?: string;
+  pihak_pertama_hp?: string;
+  pihak_kedua_nama: string;
+  pihak_kedua_nik?: string;
+  pihak_kedua_alamat?: string;
+  pihak_kedua_hp?: string;
+  proyek_id: number;
+  lokasi_proyek_nama?: string;
+  tarif_harian: number; // e.g. 1600000
+  pph_persen: number; // e.g. 2
+  bank_nama?: string; // e.g. Mandiri
+  bank_rekening?: string; // e.g. 1080030788005
+  bank_atas_nama?: string; // e.g. Irma Fitriani Dalimunte
+  unit_nopol_list?: string[];
+  tanggal_mulai?: Date;
+  status: 'aktif' | 'selesai';
+  createdAt: Date;
+  isDeleted: number;
+}
+
+export interface DailyTimesheet {
+  id?: number;
+  daily_contract_id: number;
+  plat_nomor: string;
+  tanggal: Date;
+  lokasi_detail: string; // e.g. "STA 194"
+  kegiatan: string; // e.g. "Timbunan Subgrade"
+  status_kerja: 'kerja' | 'standby' | 'breakdown' | 'hujan';
+  jumlah_hari: number; // 1 atau 0.5
+  operator_nama?: string;
+  pengawas_nama?: string;
+  bukti_timesheet?: string; // base64 photo
+  invoice_id: number | null;
+  createdAt: Date;
+  isDeleted: number;
 }
 
 export interface InvoiceQuarryPrice {
@@ -184,6 +231,8 @@ class LogistikDatabase extends Dexie {
   pinjamanGrups!: Table<PinjamanGrup>;
   kasbonMutasis!: Table<KasbonMutasi>;
   kas!: Table<Kas>;
+  dailyContracts!: Table<DailyContract>;
+  dailyTimesheets!: Table<DailyTimesheet>;
 
   constructor() {
     super('logistikpro-db');
@@ -213,6 +262,11 @@ class LogistikDatabase extends Dexie {
 
     this.version(3).stores({
       jenisMaterials: '++id, nama_material, isDeleted'
+    });
+
+    this.version(4).stores({
+      dailyContracts: '++id, nomor_kontrak, proyek_id, isDeleted',
+      dailyTimesheets: '++id, daily_contract_id, plat_nomor, tanggal, invoice_id, isDeleted'
     });
   }
 }
