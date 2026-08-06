@@ -17,7 +17,10 @@ import PrintKasbonGrup from '@/components/PrintKasbonGrup';
 export default function Finance() {
   const [activeTab, setActiveTab] = useState('buku-kas');
 
-  const kasItems = useLiveQuery(() => db.kas.reverse().toArray());
+  const kasItems = useLiveQuery(async () => {
+    const items = await db.kas.filter(k => k.is_closed !== 1).toArray();
+    return items.reverse();
+  });
   const pinjamans = useLiveQuery(() => db.pinjamanGrups.toArray());
   const mutasis = useLiveQuery(() => db.kasbonMutasis.reverse().toArray());
   const grupMobils = useLiveQuery(() => db.grupMobils.where('isDeleted').equals(0).toArray());
@@ -34,6 +37,12 @@ export default function Finance() {
   const [keteranganPinjam, setKeteranganPinjam] = useState('');
   const [tglPinjam, setTglPinjam] = useState('');
 
+  // Input Pembayaran Kasbon Mandiri
+  const [bayarGrupId, setBayarGrupId] = useState('');
+  const [bayarNominal, setBayarNominal] = useState('');
+  const [bayarKeterangan, setBayarKeterangan] = useState('');
+  const [bayarTgl, setBayarTgl] = useState('');
+
   const totalSaldoKas = kasItems?.reduce((acc, curr) => {
     return curr.jenis === 'masuk' ? acc + curr.nominal : acc - curr.nominal;
   }, 0) || 0;
@@ -48,8 +57,8 @@ export default function Finance() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleDeleteKas = async (k: any) => {
-    if (k.slip_pembayaran_id || k.invoice_id) {
-      toast.error('Tidak bisa dihapus: Transaksi ini dibuat otomatis oleh sistem (Invoice/Slip)');
+    if (k.slip_pembayaran_id || k.invoice_id || k.kasbon_mutasi_id) {
+      toast.error('Tidak bisa dihapus: Transaksi ini otomatis dari sistem (Invoice/Slip/Kasbon)');
       return;
     }
     if (confirm('Yakin ingin menghapus catatan Kas ini?')) {
@@ -68,19 +77,17 @@ export default function Finance() {
       // Revert pinjaman grup
       const p = await db.pinjamanGrups.where('grup_mobil_id').equals(mutasi.grup_mobil_id).first();
       if (p) {
+        const adjustment = mutasi.jenis === 'penambahan' ? -mutasi.nominal : mutasi.nominal;
+        const adjustmentPotongan = mutasi.jenis === 'potongan' ? -mutasi.nominal : 0;
         await db.pinjamanGrups.update(p.id!, {
-          total_pinjaman: p.total_pinjaman - mutasi.nominal,
-          sisa_kasbon: p.sisa_kasbon - mutasi.nominal
+          total_pinjaman: mutasi.jenis === 'penambahan' ? p.total_pinjaman - mutasi.nominal : p.total_pinjaman,
+          total_potongan: p.total_potongan + adjustmentPotongan,
+          sisa_kasbon: p.sisa_kasbon + adjustment
         });
       }
       
-      // Try to find and delete the related kas entry
-      const grupName = grupMobils?.find(g => g.id === mutasi.grup_mobil_id)?.nama_grup;
-      const expectedKet = `Kasbon: ${mutasi.keterangan} (Grup: ${grupName})`;
-      const kasEntry = await db.kas
-        .filter(k => k.jenis === 'keluar' && k.nominal === mutasi.nominal && k.keterangan === expectedKet)
-        .first();
-      
+      // Delete the related kas entry
+      const kasEntry = await db.kas.filter(k => k.kasbon_mutasi_id === mutasi.id).first();
       if (kasEntry) {
         await db.kas.delete(kasEntry.id!);
       }
@@ -93,8 +100,8 @@ export default function Finance() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const openEditModal = (k: any) => {
-    if (k.slip_pembayaran_id || k.invoice_id) {
-      toast.error('Tidak bisa diedit: Transaksi ini dibuat otomatis oleh sistem (Invoice/Slip)');
+    if (k.slip_pembayaran_id || k.invoice_id || k.kasbon_mutasi_id) {
+      toast.error('Tidak bisa diedit: Transaksi ini otomatis dari sistem (Invoice/Slip/Kasbon)');
       return;
     }
     setEditKasId(k.id);
@@ -134,7 +141,7 @@ export default function Finance() {
     if (!grupId || !nominalPinjam || !keteranganPinjam || !tglPinjam) return toast.error('Isi semua field');
     
     // 1. Catat mutasi pinjaman
-    await db.kasbonMutasis.add({
+    const mutasiId = await db.kasbonMutasis.add({
       grup_mobil_id: Number(grupId),
       slip_pembayaran_id: 0,
       jenis: 'penambahan',
@@ -164,12 +171,74 @@ export default function Finance() {
       jenis: 'keluar',
       nominal: Number(nominalPinjam),
       keterangan: `Kasbon: ${keteranganPinjam} (Grup: ${grupMobils?.find(g=>g.id===Number(grupId))?.nama_grup})`,
-      tanggal: new Date(tglPinjam)
+      tanggal: new Date(tglPinjam),
+      kasbon_mutasi_id: mutasiId,
+      is_closed: 0
     });
 
     toast.success('Pinjaman berhasil ditambahkan dan Kas dipotong');
     setNominalPinjam('');
     setKeteranganPinjam('');
+  };
+
+  const handleBayarPinjamanMandiri = async () => {
+    if (!bayarGrupId || !bayarNominal || !bayarKeterangan || !bayarTgl) return toast.error('Isi semua field');
+    
+    // 1. Catat mutasi pinjaman (potongan)
+    const mutasiId = await db.kasbonMutasis.add({
+      grup_mobil_id: Number(bayarGrupId),
+      slip_pembayaran_id: 0,
+      jenis: 'potongan',
+      nominal: Number(bayarNominal),
+      keterangan: bayarKeterangan,
+      tanggal: new Date(bayarTgl)
+    });
+
+    // 2. Update Pinjaman Grup
+    const p = await db.pinjamanGrups.where('grup_mobil_id').equals(Number(bayarGrupId)).first();
+    if (p) {
+      await db.pinjamanGrups.update(p.id!, {
+        total_potongan: p.total_potongan + Number(bayarNominal),
+        sisa_kasbon: p.sisa_kasbon - Number(bayarNominal)
+      });
+    }
+
+    // 3. Tambah Kas Masuk
+    await db.kas.add({
+      jenis: 'masuk',
+      nominal: Number(bayarNominal),
+      keterangan: `Pembayaran Kasbon: ${bayarKeterangan} (Grup: ${grupMobils?.find(g=>g.id===Number(bayarGrupId))?.nama_grup})`,
+      tanggal: new Date(bayarTgl),
+      kasbon_mutasi_id: mutasiId,
+      is_closed: 0
+    });
+
+    toast.success('Pembayaran pinjaman berhasil diterima');
+    setBayarNominal('');
+    setBayarKeterangan('');
+  };
+
+  const handleTutupBukuKas = async () => {
+    if (confirm(`Yakin ingin melakukan Tutup Buku Kas? Saldo kas saat ini (Rp ${totalSaldoKas.toLocaleString('id-ID')}) akan menjadi Saldo Awal di buku baru, dan riwayat lama akan diarsipkan.`)) {
+      const currentKas = await db.kas.filter(k => k.is_closed !== 1).toArray();
+      const currentSaldo = totalSaldoKas;
+
+      // Update all to is_closed = 1
+      for (const k of currentKas) {
+        await db.kas.update(k.id!, { is_closed: 1 });
+      }
+
+      // Create initial balance for new period
+      await db.kas.add({
+        jenis: 'masuk',
+        nominal: currentSaldo,
+        keterangan: 'Saldo Awal (Pindahan Tutup Buku)',
+        tanggal: new Date(),
+        is_closed: 0
+      });
+
+      toast.success('Buku Kas berhasil ditutup. Saldo awal baru telah dibuat.');
+    }
   };
 
   // Print Kasbon State
@@ -226,7 +295,12 @@ export default function Finance() {
               <p className="text-primary-foreground/80 font-medium">Saldo Kas Perusahaan</p>
               <h2 className="text-3xl font-bold mt-1">Rp {totalSaldoKas.toLocaleString('id-ID')}</h2>
             </div>
-            <Wallet className="w-10 h-10 opacity-80" />
+            <div className="flex flex-col items-end">
+              <Wallet className="w-10 h-10 opacity-80 mb-2" />
+              <Button variant="secondary" size="sm" onClick={handleTutupBukuKas} className="text-xs font-semibold">
+                Tutup Buku Kas
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -276,7 +350,7 @@ export default function Finance() {
                                   </Button>
                                 </>
                               ) : (
-                                <span className="text-xs text-muted-foreground italic">Otomatis</span>
+                                <span className="text-xs text-muted-foreground italic">{k.kasbon_mutasi_id ? 'Mutasi Kasbon' : 'Otomatis'}</span>
                               )}
                             </td>
                           </tr>
@@ -427,6 +501,34 @@ export default function Finance() {
                     <Input value={keteranganPinjam} onChange={e => setKeteranganPinjam(e.target.value)} placeholder="Bon Ban, Solar, dll" />
                   </div>
                   <Button onClick={handleSimpanPinjaman} variant="destructive" className="w-full">Berikan Pinjaman</Button>
+                </CardContent>
+              </Card>
+
+              <Card className="mt-6">
+                <CardHeader><CardTitle>Terima Pembayaran Kasbon Mandiri</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Grup Vendor</Label>
+                    <Select value={bayarGrupId} onValueChange={setBayarGrupId}>
+                      <SelectTrigger><SelectValue placeholder="Pilih Vendor"/></SelectTrigger>
+                      <SelectContent>
+                        {grupMobils?.map(g => <SelectItem key={g.id} value={g.id!.toString()}>{g.nama_grup}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tanggal</Label>
+                    <Input type="date" value={bayarTgl} onChange={e => setBayarTgl(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Nominal Pembayaran (Rp)</Label>
+                    <Input type="number" value={bayarNominal} onChange={e => setBayarNominal(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Keterangan</Label>
+                    <Input value={bayarKeterangan} onChange={e => setBayarKeterangan(e.target.value)} placeholder="Transfer Bank, Pembayaran Tunai, dll" />
+                  </div>
+                  <Button onClick={handleBayarPinjamanMandiri} className="w-full bg-emerald-600 hover:bg-emerald-700">Terima Pembayaran</Button>
                 </CardContent>
               </Card>
             </div>

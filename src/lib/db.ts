@@ -212,6 +212,8 @@ export interface Kas {
   tanggal: Date;
   slip_pembayaran_id?: number | null;
   invoice_id?: number | null;
+  kasbon_mutasi_id?: number | null;
+  is_closed?: number;
 }
 
 // === Database Class ===
@@ -268,6 +270,14 @@ class LogistikDatabase extends Dexie {
     this.version(4).stores({
       dailyContracts: '++id, nomor_kontrak, proyek_id, isDeleted',
       dailyTimesheets: '++id, daily_contract_id, plat_nomor, tanggal, invoice_id, isDeleted'
+    });
+
+    this.version(5).stores({
+      kas: '++id, jenis, tanggal, slip_pembayaran_id, invoice_id, kasbon_mutasi_id, is_closed'
+    }).upgrade(async (tx) => {
+      return tx.table('kas').toCollection().modify(k => {
+        k.is_closed = 0;
+      });
     });
   }
 }
