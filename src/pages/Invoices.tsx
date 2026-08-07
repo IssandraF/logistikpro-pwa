@@ -692,7 +692,7 @@ export default function Invoices() {
                      </div>
                      <div className="p-4 bg-background border rounded shadow-sm">
                        <p className="text-sm text-muted-foreground">Total Kubikasi</p>
-                       <p className="text-2xl font-bold">{totalVolume.toFixed(2)} M³</p>
+                       <p className="text-2xl font-bold">{totalVolume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} M³</p>
                      </div>
                      <div className="col-span-2 p-4 bg-background border rounded shadow-sm">
                        <p className="text-sm text-muted-foreground">Harga Kotor</p>

@@ -115,7 +115,7 @@ export default function PrintSlip({
               <tr key={rute}>
                 <td className="text-center">{idx + 1}</td>
                 <td className="text-left font-bold pl-2">{rute.toUpperCase()}</td>
-                <td className="text-center">{volTotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="text-center">{volTotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
                 <td className="text-center">{routeTrips.length}x rit</td>
                 <td className="text-right pr-2">Rp {subtot.toLocaleString('id-ID')}</td>
               </tr>
@@ -209,7 +209,7 @@ export default function PrintSlip({
                     <tr key={t.id}>
                       <td className="text-center">{noTripLokasi++}</td>
                       <td className="text-center font-bold">{t.plat_nomor}</td>
-                      <td className="text-center">{t.volume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="text-center">{t.volume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
                       <td className="text-right pr-2">Rp {(t.harga_bayar || 0).toLocaleString('id-ID')}</td>
                       <td className="text-right pr-2 font-bold">Rp {(t.volume * (t.harga_bayar || 0)).toLocaleString('id-ID')}</td>
                     </tr>
@@ -224,7 +224,7 @@ export default function PrintSlip({
                       <>
                         <tr className="bg-[#f0f0f0] font-bold">
                           <td colSpan={2} className="text-center">SUBTOTAL KOTOR ({tripsSorted.length} Rit)</td>
-                          <td className="text-center">{volSum.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="text-center">{volSum.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
                           <td className="text-center">-</td>
                           <td className="text-right pr-2">Rp {subTotalKotor.toLocaleString('id-ID')}</td>
                         </tr>

@@ -98,7 +98,7 @@ export default function PrintRekapTrips({
                   <td className="text-center">{idx + 1}</td>
                   <td className="pl-2 font-medium">{getLokasiName(Number(plIdStr))}</td>
                   <td className="text-center">{grupLokasi.length} Rit</td>
-                  <td className="text-center">{grupLokasi.reduce((s, t) => s + t.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="text-center">{grupLokasi.reduce((s, t) => s + t.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
                 </tr>
               ))}
             </tbody>
@@ -106,7 +106,7 @@ export default function PrintRekapTrips({
               <tr className="bg-[#f8f9fa] font-bold">
                 <th colSpan={2} className="text-right pr-2">TOTAL KESELURUHAN:</th>
                 <th className="text-center">{trips.length} Rit</th>
-                <th className="text-center">{trips.reduce((s, t) => s + t.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</th>
+                <th className="text-center">{trips.reduce((s, t) => s + t.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</th>
               </tr>
             </tfoot>
           </table>
@@ -136,7 +136,7 @@ export default function PrintRekapTrips({
                       <td className="pl-2">{kuari}</td>
                       <td className="pl-2">{bongkar}</td>
                       <td className="text-center">{grup.length} Rit</td>
-                      <td className="text-center">{grup.reduce((s, x) => s + x.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="text-center">{grup.reduce((s, x) => s + x.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
                     </tr>
                   );
                 })}
@@ -145,7 +145,7 @@ export default function PrintRekapTrips({
                 <tr className="bg-[#f8f9fa] font-bold">
                   <th colSpan={2} className="text-right pr-2">TOTAL:</th>
                   <th className="text-center">{trips.length} Rit</th>
-                  <th className="text-center">{trips.reduce((s, t) => s + t.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</th>
+                  <th className="text-center">{trips.reduce((s, t) => s + t.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</th>
                 </tr>
               </tfoot>
             </table>
@@ -209,14 +209,14 @@ export default function PrintRekapTrips({
                         <td className="text-center">{format(new Date(trip.tanggal_muat), 'dd/MM/yyyy')}</td>
                         <td className="text-center">{getKuariName(trip.lokasi_kuari_id)}</td>
                         <td className="text-center font-bold">{trip.plat_nomor}</td>
-                        <td className="text-center">{trip.volume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="text-center">{trip.volume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr className="bg-[#f8f9fa] font-bold">
                       <th colSpan={4} className="text-right pr-2">SUBTOTAL TANGGAL {format(new Date(tgl), 'dd/MM/yyyy')}:</th>
-                      <th className="text-center">{harian.reduce((s, x) => s + x.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</th>
+                      <th className="text-center">{harian.reduce((s, x) => s + x.volume, 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</th>
                     </tr>
                   </tfoot>
                 </table>

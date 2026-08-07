@@ -203,7 +203,7 @@ export default function PrintInvoice({
                       <td className={`text-center ${borderTop}`}>{getLokasiName(first.proyek_lokasi_id)}</td>
                       <td className={`text-center ${borderTop}`}>{groupLabel}</td>
                       <td className={`text-center ${borderTop}`}>{items.length} Rit</td>
-                      <td className={`text-right ${borderTop}`}>{totalVol.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className={`text-right ${borderTop}`}>{totalVol.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
                       <td className={`text-right ${borderTop}`}>Rp {first.harga_trip.toLocaleString('id-ID')}</td>
                       <td className={`text-right ${borderTop}`}>Rp {totalHarga.toLocaleString('id-ID')}</td>
                     </tr>
@@ -212,7 +212,7 @@ export default function PrintInvoice({
                 <tr className="font-bold bg-[#f0f0f0]">
                   <td colSpan={4} className="text-center">TOTAL {groupLabel}</td>
                   <td className="text-center">{groupTrips.length} Rit</td>
-                  <td className="text-right">{totalVolumeGroup.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="text-right">{totalVolumeGroup.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
                   <td></td>
                   <td className="text-right">Rp {totalKotorGroup.toLocaleString('id-ID')}</td>
                 </tr>
@@ -318,16 +318,16 @@ export default function PrintInvoice({
                       <td className="text-center">DT</td>
                       <td className="text-center font-bold">{trip.plat_nomor}</td>
                       <td className="text-center">{getKuariName(trip.lokasi_kuari_id)}</td>
-                      <td className="text-center">{trip.volume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="text-center">{trip.volume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
                       <td className="text-center font-bold" style={{ background: idx === 0 ? '#f0f0f0' : 'transparent', borderTop: idx === 0 ? '1px solid #000' : 'none', borderBottom: idx === dailyTrips.length - 1 ? '1px solid #000' : 'none' }}>
-                        {idx === 0 ? dailyVolume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}
+                        {idx === 0 ? dailyVolume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 }) : ''}
                       </td>
                     </tr>
                   ));
                 }).concat([
                   <tr key="total" className="bg-[#f0f0f0] font-bold">
                     <td colSpan={6} className="text-center">TOTAL VOLUME</td>
-                    <td className="text-right">{totalVolumeLokasi.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="text-right">{totalVolumeLokasi.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}</td>
                   </tr>
                 ]);
               })()}
