@@ -120,139 +120,185 @@ export default function PrintInvoice({
       </style>
 
       {templateType === 'classic' ? (
-        /* === TEMPLATE 2: KLASIK RINGKAS (TAMPLATE_INV_2.pdf) === */
-        <div className="classic-template font-sans text-black">
-          {/* Header INVOICE & No */}
-          <div className="text-center mb-6">
-            <h1 className="text-[20px] font-bold tracking-wider border-b-2 inline-block border-black pb-0.5">INVOICE</h1>
-            <p className="text-sm font-semibold mt-1">No. {invoice.nomor_invoice}</p>
+        /* === TEMPLATE 2: KLASIK RINGKAS === */
+        <div className="font-sans text-black text-[11px]">
+
+          {/* Header: Nama Perusahaan + INVOICE */}
+          <div className="flex justify-between items-start mb-4 pb-3 border-b-2 border-black">
+            <div>
+              <div className="text-[15px] font-extrabold tracking-widest">{owner.nama.toUpperCase()}</div>
+              {owner.alamat && <div className="text-[10px] text-gray-500 mt-0.5">{owner.alamat}</div>}
+            </div>
+            <div className="text-right">
+              <div className="text-[22px] font-extrabold tracking-[0.12em]">INVOICE</div>
+              <div className="text-[10px] mt-0.5">No. <strong>{invoice.nomor_invoice}</strong></div>
+              <div className="text-[10px]">Tanggal : <strong>{format(new Date(invoice.tanggal_invoice), 'dd/MM/yyyy')}</strong></div>
+            </div>
           </div>
 
-          {/* Customer & Info Table */}
-          <table className="w-full mb-6 text-sm border-none">
-            <tbody>
-              <tr>
-                <td className="w-[55%] align-top border-none p-1 leading-relaxed">
-                  <div className="font-semibold text-gray-700">Kepada Yth.</div>
-                  <div className="font-bold text-base">{invoice.kepada_custom ? invoice.kepada_custom.toUpperCase() : proyek.nama_proyek.toUpperCase()}</div>
-                  <div>Di</div>
-                  <div>Pekanbaru</div>
-                </td>
-                <td className="w-[45%] align-top border-none p-1">
-                  <table className="w-full border-none text-xs">
-                    <tbody>
-                      <tr>
-                        <td className="w-[45%] font-medium border-none p-0.5">Tanggal</td>
-                        <td className="w-[55%] border-none p-0.5">: {format(new Date(invoice.tanggal_invoice), 'dd/MM/yyyy')}</td>
-                      </tr>
-                      <tr>
-                        <td className="font-medium border-none p-0.5">Mata Uang</td>
-                        <td className="border-none p-0.5">: IDR</td>
-                      </tr>
-                      <tr>
-                        <td className="font-medium border-none p-0.5">Cara Pembayaran</td>
-                        <td className="border-none p-0.5">: Transfer</td>
-                      </tr>
-                      <tr>
-                        <td className="font-medium border-none p-0.5">Tgl Jatuh Tempo</td>
-                        <td className="border-none p-0.5">: -</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          {/* Kepada & Info Pembayaran */}
+          <div className="flex justify-between items-start mb-4">
+            <div className="leading-snug">
+              <div className="text-[9px] font-semibold uppercase tracking-wide text-gray-500 mb-0.5">Kepada Yth.</div>
+              <div className="text-[12px] font-bold">
+                {invoice.kepada_custom ? invoice.kepada_custom.toUpperCase() : proyek.nama_proyek.toUpperCase()}
+              </div>
+              <div className="text-[10px] text-gray-500">Di - Tempat</div>
+            </div>
+            <div className="text-[10px] text-right space-y-0.5">
+              <div><span className="font-medium">Mata Uang</span> : IDR</div>
+              <div><span className="font-medium">Cara Pembayaran</span> : Transfer Bank</div>
+              <div><span className="font-medium">Jatuh Tempo</span> : -</div>
+            </div>
+          </div>
 
-          {/* Classic Main Table */}
-          <table className="w-full text-xs mb-0 border-collapse border border-black">
+          {/* Tabel Utama */}
+          <table className="w-full border-collapse text-[10px]">
+            <colgroup>
+              <col style={{ width: '4%' }} />
+              <col style={{ width: '33%' }} />
+              <col style={{ width: '21%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '13%' }} />
+            </colgroup>
             <thead>
-              <tr style={{ backgroundColor: accentColor, color: '#000' }} className="font-bold border-b border-black">
-                <th className="border border-black p-2 text-center w-[5%]" rowSpan={2}>NO</th>
-                <th className="border border-black p-2 text-center w-[30%]" rowSpan={2}>DESKRIPSI</th>
-                <th className="border border-black p-2 text-center w-[20%]" rowSpan={2}>No.Kontrak Kontraktor</th>
-                <th className="border border-black p-1 text-center" colSpan={4}>AMMOUNT</th>
+              <tr style={{ backgroundColor: accentColor }} className="text-black font-bold text-center">
+                <th className="border border-black py-1.5 px-1 align-middle" rowSpan={2}>NO</th>
+                <th className="border border-black py-1.5 px-2 align-middle" rowSpan={2}>DESKRIPSI</th>
+                <th className="border border-black py-1.5 px-2 align-middle" rowSpan={2}>No. Kontrak Kontraktor</th>
+                <th className="border border-black py-1 px-1" colSpan={4}>AMOUNT</th>
               </tr>
-              <tr style={{ backgroundColor: accentColor, color: '#000' }} className="font-bold border-b border-black">
-                <th className="border border-black p-1 text-center w-[10%]">Qty</th>
-                <th className="border border-black p-1 text-center w-[10%]">Satuan</th>
-                <th className="border border-black p-1 text-right w-[12.5%]">Harga Satuan</th>
-                <th className="border border-black p-1 text-right w-[12.5%]">Jumlah</th>
+              <tr style={{ backgroundColor: accentColor }} className="text-black font-bold text-center">
+                <th className="border border-black py-1 px-1">Qty</th>
+                <th className="border border-black py-1 px-1">Sat.</th>
+                <th className="border border-black py-1 px-1">Harga Satuan (Rp)</th>
+                <th className="border border-black py-1 px-1">Jumlah (Rp)</th>
               </tr>
             </thead>
             <tbody>
-              {/* Row 1: Pengiriman Utama */}
-              <tr>
-                <td className="border border-black p-2 text-center align-top">1</td>
-                <td className="border border-black p-2 align-top">
-                  <div className="font-bold">CBM Tanah Timbun / Pengiriman Material</div>
-                  <div className="text-[10px] text-gray-600">Total Volume: {invoice.total_kubikasi} M³ ({trips.length} Rit)</div>
+              {/* Baris 1 — Pengiriman */}
+              <tr className="align-top">
+                <td className="border border-black py-3 px-1 text-center">1</td>
+                <td className="border border-black py-3 px-2">
+                  <div className="font-bold">Pengiriman Material / Tanah Timbun</div>
+                  <div className="text-[9px] text-gray-500 mt-0.5">
+                    {trips.length} Ritase &mdash; Vol. Total: {invoice.total_kubikasi.toLocaleString('id-ID')} M³
+                  </div>
                 </td>
-                <td className="border border-black p-2 align-top">
-                  <div className="h-10 border-b border-dashed border-gray-300"></div>
+                <td className="border border-black py-3 px-2 text-center text-gray-400 italic text-[9px]">—</td>
+                <td className="border border-black py-3 px-1 text-right font-semibold">
+                  {(invoice.volume_ditagih ?? invoice.total_kubikasi).toLocaleString('id-ID')}
                 </td>
-                <td className="border border-black p-2 text-center align-top font-semibold">{(invoice.volume_ditagih ?? invoice.total_kubikasi).toLocaleString('id-ID')}</td>
-                <td className="border border-black p-2 text-center align-top font-semibold">M3</td>
-                <td className="border border-black p-2 text-right align-top font-medium">{(invoice.harga_per_kubik ? Math.round(invoice.harga_per_kubik) : Math.round(invoice.total_harga_kotor / ((invoice.volume_ditagih ?? invoice.total_kubikasi) || 1))).toLocaleString('id-ID')}</td>
-                <td className="border border-black p-2 text-right align-top font-bold">Rp {invoice.total_harga_kotor.toLocaleString('id-ID')}</td>
+                <td className="border border-black py-3 px-1 text-center font-semibold">M³</td>
+                <td className="border border-black py-3 px-2 text-right">
+                  {(invoice.harga_per_kubik
+                    ? Math.round(invoice.harga_per_kubik)
+                    : Math.round(invoice.total_harga_kotor / ((invoice.volume_ditagih ?? invoice.total_kubikasi) || 1))
+                  ).toLocaleString('id-ID')}
+                </td>
+                <td className="border border-black py-3 px-2 text-right font-bold">
+                  {invoice.total_harga_kotor.toLocaleString('id-ID')}
+                </td>
               </tr>
 
-              {/* Row 2: Sisa Volume Inv Sebelumnya if any */}
+              {/* Baris 2 — Sisa Volume Invoice Sebelumnya (opsional) */}
               {invoice.sisa_volume_sebelumnya !== undefined && invoice.sisa_volume_sebelumnya > 0 && (
-                <tr className="bg-blue-50/40">
-                  <td className="border border-black p-2 text-center align-top">2</td>
-                  <td className="border border-black p-2 align-top font-semibold">+ Sisa Volume Inv Sebelumnya</td>
-                  <td className="border border-black p-2 align-top"></td>
-                  <td className="border border-black p-2 text-center align-top font-bold">{invoice.sisa_volume_sebelumnya.toLocaleString('id-ID')}</td>
-                  <td className="border border-black p-2 text-center align-top font-semibold">M3</td>
-                  <td className="border border-black p-2 text-right align-top font-medium">{(invoice.harga_per_kubik ? Math.round(invoice.harga_per_kubik) : 0).toLocaleString('id-ID')}</td>
-                  <td className="border border-black p-2 text-right align-top font-bold">Rp {((invoice.sisa_volume_sebelumnya) * (invoice.harga_per_kubik || 0)).toLocaleString('id-ID')}</td>
+                <tr className="align-top bg-blue-50">
+                  <td className="border border-black py-3 px-1 text-center">2</td>
+                  <td className="border border-black py-3 px-2 font-semibold">
+                    Sisa Volume Invoice Sebelumnya
+                  </td>
+                  <td className="border border-black py-3 px-2 text-center text-gray-400 italic text-[9px]">—</td>
+                  <td className="border border-black py-3 px-1 text-right font-semibold">
+                    {invoice.sisa_volume_sebelumnya.toLocaleString('id-ID')}
+                  </td>
+                  <td className="border border-black py-3 px-1 text-center font-semibold">M³</td>
+                  <td className="border border-black py-3 px-2 text-right">
+                    {(invoice.harga_per_kubik ? Math.round(invoice.harga_per_kubik) : 0).toLocaleString('id-ID')}
+                  </td>
+                  <td className="border border-black py-3 px-2 text-right font-bold">
+                    {(invoice.sisa_volume_sebelumnya * (invoice.harga_per_kubik || 0)).toLocaleString('id-ID')}
+                  </td>
                 </tr>
               )}
 
-              {/* TOTAL PO Row */}
-              <tr className="font-bold">
-                <td colSpan={5} className="border-none"></td>
-                <td className="border border-black p-2 text-right bg-gray-100">TOTAL PO</td>
-                <td className="border border-black p-2 text-right bg-gray-100">Rp {invoice.total_harga_kotor.toLocaleString('id-ID')}</td>
+              {/* Baris kosong agar ada jarak */}
+              <tr><td className="border border-black py-3" colSpan={7}></td></tr>
+
+              {/* Sub Total */}
+              <tr className="font-bold bg-gray-50">
+                <td colSpan={5} className="border border-black py-1.5 px-2 text-right">Sub Total</td>
+                <td className="border border-black py-1.5 px-2 text-right">Rp</td>
+                <td className="border border-black py-1.5 px-2 text-right">
+                  {invoice.total_harga_kotor.toLocaleString('id-ID')}
+                </td>
               </tr>
 
-              {/* Potongan Material Row */}
+              {/* Potongan Material (jika ada) */}
               {invoice.is_potong_material === 1 && (
-                <tr className="font-bold text-red-600">
-                  <td colSpan={5} className="border-none"></td>
-                  <td className="border border-black p-2 text-right bg-red-50">POTONGAN MATERIAL</td>
-                  <td className="border border-black p-2 text-right bg-red-50">- Rp {invoice.total_potongan_material.toLocaleString('id-ID')}</td>
+                <tr className="font-bold text-red-700 bg-red-50">
+                  <td colSpan={5} className="border border-black py-1.5 px-2 text-right">Potongan Material</td>
+                  <td className="border border-black py-1.5 px-2 text-right">Rp</td>
+                  <td className="border border-black py-1.5 px-2 text-right">
+                    ({invoice.total_potongan_material.toLocaleString('id-ID')})
+                  </td>
                 </tr>
               )}
 
-              {/* GRAND TOTAL Row */}
-              <tr className="font-extrabold text-sm" style={{ backgroundColor: accentColor, color: '#000' }}>
-                <td colSpan={5} className="border-none"></td>
-                <td className="border border-black p-2 text-right">GRAND TOTAL</td>
-                <td className="border border-black p-2 text-right">Rp {invoice.total_harga_bersih.toLocaleString('id-ID')}</td>
+              {/* Grand Total */}
+              <tr className="font-extrabold text-[11px]" style={{ backgroundColor: accentColor, color: '#000' }}>
+                <td colSpan={5} className="border border-black py-2 px-2 text-right uppercase tracking-wide">Grand Total</td>
+                <td className="border border-black py-2 px-2 text-right">Rp</td>
+                <td className="border border-black py-2 px-2 text-right">
+                  {invoice.total_harga_bersih.toLocaleString('id-ID')}
+                </td>
               </tr>
             </tbody>
           </table>
 
-          {/* Terbilang Full Width Box */}
-          <div style={{ backgroundColor: accentColor, filter: 'brightness(0.95)', color: '#000' }} className="p-2 border border-black font-semibold italic text-xs mb-8">
-            Terbilang : {generateTerbilangText(invoice.total_harga_bersih)}
+          {/* Terbilang */}
+          <div
+            className="border border-t-0 border-black px-3 py-2 text-[10px] mb-6"
+            style={{ backgroundColor: accentColor }}
+          >
+            <span className="font-bold">Terbilang :</span>&nbsp;
+            <span className="italic">{generateTerbilangText(invoice.total_harga_bersih)}</span>
           </div>
 
-          {/* Bank & Signature Section */}
-          <div className="grid grid-cols-2 gap-6 text-xs">
-            <div style={{ backgroundColor: accentColor, opacity: 0.35, color: '#000' }} className="p-3 border border-black rounded-sm space-y-1">
-              <p className="font-bold underline mb-2">Mohon pembayaran di transfer ke rekening berikut:</p>
-              <p><strong>Nama</strong> : {owner.atas_nama}</p>
-              <p><strong>Nama Bank</strong> : {owner.nama_bank}</p>
-              <p><strong>Nomor Rekening</strong> : {owner.no_rek}</p>
+          {/* Rekening & Tanda Tangan */}
+          <div className="flex gap-6 mt-2 text-[10px]">
+            {/* Kotak Rekening */}
+            <div className="flex-1 border border-black p-3" style={{ backgroundColor: accentColor }}>
+              <div className="font-bold underline mb-2 text-[11px]">Mohon pembayaran ditransfer ke rekening:</div>
+              <table className="w-full border-none text-[10px]">
+                <tbody>
+                  <tr>
+                    <td className="border-none py-0.5 w-[36%] font-medium">Nama</td>
+                    <td className="border-none py-0.5">: <strong>{owner.atas_nama}</strong></td>
+                  </tr>
+                  <tr>
+                    <td className="border-none py-0.5 font-medium">Bank</td>
+                    <td className="border-none py-0.5">: <strong>{owner.nama_bank}</strong></td>
+                  </tr>
+                  <tr>
+                    <td className="border-none py-0.5 font-medium">No. Rekening</td>
+                    <td className="border-none py-0.5">: <strong>{owner.no_rek}</strong></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
-            <div className="text-center flex flex-col justify-between items-center py-1">
-              <p className="font-semibold">Hormat Kami,</p>
-              <div className="h-14"></div>
-              <p className="font-bold underline text-sm">{(invoice.nama_ttd || owner.nama).toUpperCase()}</p>
+            {/* Tanda Tangan */}
+            <div className="w-[200px] text-center flex flex-col items-center justify-between">
+              <div className="text-[10px] mb-1">
+                {format(new Date(invoice.tanggal_invoice), 'dd MMMM yyyy', { locale: id })}
+              </div>
+              <div className="font-semibold text-[10px] mb-10">Hormat Kami,</div>
+              <div className="border-t border-black w-full pt-1 font-bold text-[10px]">
+                {(invoice.nama_ttd || owner.nama).toUpperCase()}
+              </div>
             </div>
           </div>
         </div>
