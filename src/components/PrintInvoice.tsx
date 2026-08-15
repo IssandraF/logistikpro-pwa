@@ -42,7 +42,7 @@ export default function PrintInvoice({
   // Sort Summary Grouped by Muat|Bongkar|Lokasi
   const summaryTrips = [...trips].sort((a, b) => new Date(a.tanggal_bongkar).getTime() - new Date(b.tanggal_bongkar).getTime());
 
-  // --- PERBAIKAN: Pembuatan Hash Map untuk performa O(1) ---
+  // Hash Map untuk performa O(1)
   const materialMap = jenisMaterials.reduce((acc, m) => {
     if (m.id != null) acc[m.id] = m.nama_material;
     return acc;
@@ -53,16 +53,14 @@ export default function PrintInvoice({
     return acc;
   }, {} as Record<number, string>);
 
-  // --- PERBAIKAN: Split trips by Group (Unique Logic vs UI Label) ---
+  // Split trips by Group
   const tripGroups = summaryTrips.reduce((acc, t) => {
     const material = t.jenis_material_id != null ? materialMap[t.jenis_material_id] : null;
-    
-    // 1. Kunci Unik di belakang layar (kombinasi ID Material & ID Jasa)
+
     const idMat = t.jenis_material_id ?? '0';
     const idJas = t.jenis_jasa_id ?? '0';
     const uniqueKey = `${idMat}-${idJas}`;
 
-    // 2. Label yang akan muncul di layar (HANYA MATERIAL)
     const displayLabel = (material ? material : 'CBM').toUpperCase();
 
     if (!acc[uniqueKey]) {
@@ -71,11 +69,10 @@ export default function PrintInvoice({
         trips: []
       };
     }
-    
+
     acc[uniqueKey].trips.push(t);
     return acc;
   }, {} as Record<string, { label: string; trips: Trip[] }>);
-
 
   // For Rekap and Photos Grouped by Lokasi Name
   const getLokasiName = (plId: number) => {
@@ -203,7 +200,7 @@ export default function PrintInvoice({
                 </td>
               </tr>
 
-              {/* Baris 2 — Sisa Volume Invoice Sebelumnya (opsional) */}
+              {/* Baris 2 — Sisa Volume Invoice Sebelumnya */}
               {invoice.sisa_volume_sebelumnya !== undefined && invoice.sisa_volume_sebelumnya > 0 && (
                 <tr className="align-top bg-blue-50">
                   <td className="border border-black py-3 px-1 text-center">2</td>
@@ -236,7 +233,7 @@ export default function PrintInvoice({
                 </td>
               </tr>
 
-              {/* Potongan Material (jika ada) */}
+              {/* Potongan Material */}
               {invoice.is_potong_material === 1 && (
                 <tr className="font-bold text-red-700 bg-red-50">
                   <td colSpan={5} className="border border-black py-1.5 px-2 text-right">Potongan Material</td>
@@ -267,9 +264,8 @@ export default function PrintInvoice({
             <span className="italic">{generateTerbilangText(invoice.total_harga_bersih)}</span>
           </div>
 
-          {/* Rekening & Tanda Tangan */}
+          {/* Rekening & Tanda Tangan Classic */}
           <div className="flex gap-6 mt-2 text-[10px]">
-            {/* Kotak Rekening */}
             <div className="flex-1 border border-black p-3" style={{ backgroundColor: accentColor }}>
               <div className="font-bold underline mb-2 text-[11px]">Mohon pembayaran ditransfer ke rekening:</div>
               <table className="w-full border-none text-[10px]">
@@ -290,7 +286,6 @@ export default function PrintInvoice({
               </table>
             </div>
 
-            {/* Tanda Tangan */}
             <div className="w-[200px] text-center flex flex-col items-center justify-between">
               <div className="text-[10px] mb-1">
                 {format(new Date(invoice.tanggal_invoice), 'dd MMMM yyyy', { locale: id })}
@@ -303,7 +298,7 @@ export default function PrintInvoice({
           </div>
         </div>
       ) : (
-        /* === TEMPLATE 1: STANDAR / DETAIL (Grouped Trips Summary) === */
+        /* === TEMPLATE 1: STANDAR / DETAIL === */
         <>
           <div className="text-center font-bold underline mb-5 text-[16px]">INVOICE</div>
 
@@ -451,6 +446,7 @@ export default function PrintInvoice({
             {generateTerbilangText(invoice.total_harga_bersih)}
           </div>
 
+          {/* Rekening & Tanda Tangan Standard */}
           <div className="mt-5">
             <p><strong>Pembayaran dapat ditransfer ke:</strong><br />
               {owner.nama_bank}: {owner.no_rek} A.n {owner.atas_nama}
@@ -471,25 +467,6 @@ export default function PrintInvoice({
           </table>
         </>
       )}
-
-      <div className="mt-5">
-        <p><strong>Pembayaran dapat ditransfer ke:</strong><br />
-          {owner.nama_bank}: {owner.no_rek} A.n {owner.atas_nama}
-        </p>
-      </div>
-
-      <table className="w-full mt-12 border-none">
-        <tbody>
-          <tr>
-            <td className="w-[70%] border-none"></td>
-            <td className="w-[30%] text-center border-none">
-              {format(new Date(invoice.tanggal_invoice), 'EEEE, dd MMMM yyyy', { locale: id })}<br />
-              Hormat kami,<br /><br /><br /><br /><br />
-              <strong>{(invoice.nama_ttd || owner.nama).toUpperCase()}</strong>
-            </td>
-          </tr>
-        </tbody>
-      </table>
 
       {/* REKAP DETAIL PER LOKASI */}
       {Object.entries(groupedByLokasiName).map(([lokasi, tripsLokasi]) => (
@@ -516,7 +493,6 @@ export default function PrintInvoice({
             <tbody>
               {(() => {
                 let totalVolumeLokasi = 0;
-                // Group by date combo inside the location
                 const tripsByDate = tripsLokasi.reduce((acc, t) => {
                   const key = `${format(new Date(t.tanggal_muat), 'yyyy-MM-dd')}|${format(new Date(t.tanggal_bongkar), 'yyyy-MM-dd')}`;
                   if (!acc[key]) acc[key] = [];
@@ -585,7 +561,7 @@ export default function PrintInvoice({
                         <div className="text-[10px] mb-2">
                           Vol: {trip.volume} M³ | Muat: {getKuariName(trip.lokasi_kuari_id)}
                         </div>
-                        <img src={trip.bukti_do} className="max-w-[90%] max-h-[250px] object-contain border border-gray-200 p-[2px] mx-auto" />
+                        <img src={trip.bukti_do} className="max-w-[90%] max-h-[250px] object-contain border border-gray-200 p-[2px] mx-auto" alt="Bukti DO" />
                       </div>
                     ))}
                   </div>
@@ -598,4 +574,4 @@ export default function PrintInvoice({
 
     </div>
   );
-} 
+}
