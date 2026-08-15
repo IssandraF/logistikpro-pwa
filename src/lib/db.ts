@@ -118,6 +118,12 @@ export interface Invoice {
   total_pph?: number;
   pph_persen?: number;
   rekening_bank?: string;
+  volume_ditagih?: number;
+  sisa_volume?: number;
+  harga_per_kubik?: number;
+  is_custom_total?: boolean;
+  sisa_invoice_sebelumnya?: number;
+  total_keseluruhan?: number;
   createdAt: Date;
 }
 

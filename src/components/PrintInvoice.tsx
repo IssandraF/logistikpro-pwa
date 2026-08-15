@@ -234,17 +234,36 @@ export default function PrintInvoice({
         );
       })}
 
+      {/* Split Volume Banner if custom volume is billed */}
+      {invoice.volume_ditagih !== undefined && invoice.sisa_volume !== undefined && invoice.sisa_volume > 0 && (
+        <div className="mb-4 text-xs p-2 bg-gray-100 border border-gray-300 font-semibold rounded flex justify-between">
+          <span>Total Vol Pengiriman: <strong>{invoice.total_kubikasi.toLocaleString('id-ID')} M³</strong></span>
+          <span>Volume Ditagihkan: <strong>{invoice.volume_ditagih.toLocaleString('id-ID')} M³</strong></span>
+          <span className="text-amber-700">Sisa Vol Inv Selanjutnya: <strong>{invoice.sisa_volume.toLocaleString('id-ID')} M³</strong></span>
+        </div>
+      )}
+
       <table className="main-table w-full mb-4">
         <tbody>
-          <tr className="font-bold bg-[#f0f0f0] text-[15px]">
-            <td className="text-center w-[70%]">TOTAL NILAI PO KESELURUHAN</td>
+          <tr className="font-bold bg-[#f0f0f0] text-[14px]">
+            <td className="text-center w-[70%]">TOTAL NILAI PO INVOICE INI (BERSIH)</td>
             <td className="text-right w-[30%]">Rp {invoice.total_harga_bersih.toLocaleString('id-ID')}</td>
+          </tr>
+          {invoice.sisa_invoice_sebelumnya !== undefined && invoice.sisa_invoice_sebelumnya > 0 && (
+            <tr className="font-bold bg-[#fffbeb] text-amber-900 text-[14px]">
+              <td className="text-center w-[70%]">+ SISA INVOICE SEBELUMNYA</td>
+              <td className="text-right w-[30%]">Rp {invoice.sisa_invoice_sebelumnya.toLocaleString('id-ID')}</td>
+            </tr>
+          )}
+          <tr className="font-bold bg-[#00B0F0] text-black text-[15px]">
+            <td className="text-center w-[70%]">TOTAL KESELURUHAN YANG HARUS DIBAYAR</td>
+            <td className="text-right w-[30%]">Rp {(invoice.total_keseluruhan ?? invoice.total_harga_bersih).toLocaleString('id-ID')}</td>
           </tr>
         </tbody>
       </table>
 
-      <div className="mt-8 italic bg-[#f9f9f9] p-3 border-l-4 border-gray-400 font-bold">
-        {generateTerbilangText(invoice.total_harga_bersih)}
+      <div className="mt-6 italic bg-[#f9f9f9] p-3 border-l-4 border-gray-400 font-bold">
+        {generateTerbilangText(invoice.total_keseluruhan ?? invoice.total_harga_bersih)}
       </div>
 
       <div className="mt-5">

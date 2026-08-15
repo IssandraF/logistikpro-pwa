@@ -64,6 +64,12 @@ export default function Invoices() {
   const [kepadaCustom, setKepadaCustom] = useState('');
   const [namaTtd, setNamaTtd] = useState('');
 
+  // Split Volume & Custom Price / Balance States
+  const [volumeDitagihInput, setVolumeDitagihInput] = useState('');
+  const [hargaPerKubikInput, setHargaPerKubikInput] = useState('');
+  const [totalKotorInput, setTotalKotorInput] = useState('');
+  const [sisaInvSebelumnyaInput, setSisaInvSebelumnyaInput] = useState('');
+
   // Print States
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
@@ -208,12 +214,59 @@ export default function Invoices() {
   const totalPotongan = useMemo(() => {
     return filteredTrips
       .filter(t => selectedTripsForInvoice.includes(t.id!))
-      .reduce((sum, t) => sum + (t.potongan_material_invoice || 0), 0);
-  }, [filteredTrips, selectedTripsForInvoice]);
+      .reduce((sum, t) => {
+        const jasa = jenisJasas?.find(j => j.id === t.jenis_jasa_id);
+        const isUg = jasa ? jasa.nama_js.toLowerCase().includes('ug') || jasa.nama_js.toLowerCase().includes('upah gendong') : true;
+        if (!isUg) return sum;
+        return sum + (t.potongan_material_invoice || 0);
+      }, 0);
+  }, [filteredTrips, selectedTripsForInvoice, jenisJasas]);
 
-  const totalBersih = totalKotor - totalPotongan;
+  const volumeDitagihVal = useMemo(() => {
+    if (volumeDitagihInput !== '' && !isNaN(Number(volumeDitagihInput))) {
+      return Number(volumeDitagihInput);
+    }
+    return totalVolume;
+  }, [volumeDitagihInput, totalVolume]);
 
-  // Removed handlePriceChange
+  const sisaVolumeVal = useMemo(() => {
+    return Math.max(0, totalVolume - volumeDitagihVal);
+  }, [totalVolume, volumeDitagihVal]);
+
+  const effectiveTotalKotor = useMemo(() => {
+    if (totalKotorInput !== '' && !isNaN(Number(totalKotorInput))) {
+      return Number(totalKotorInput);
+    }
+    if (hargaPerKubikInput !== '' && !isNaN(Number(hargaPerKubikInput))) {
+      return volumeDitagihVal * Number(hargaPerKubikInput);
+    }
+    if (totalVolume > 0 && volumeDitagihVal !== totalVolume) {
+      return (totalKotor / totalVolume) * volumeDitagihVal;
+    }
+    return totalKotor;
+  }, [totalKotorInput, hargaPerKubikInput, volumeDitagihVal, totalVolume, totalKotor]);
+
+  const effectiveHargaPerKubik = useMemo(() => {
+    if (hargaPerKubikInput !== '' && !isNaN(Number(hargaPerKubikInput))) {
+      return Number(hargaPerKubikInput);
+    }
+    if (volumeDitagihVal > 0) {
+      return effectiveTotalKotor / volumeDitagihVal;
+    }
+    return 0;
+  }, [hargaPerKubikInput, effectiveTotalKotor, volumeDitagihVal]);
+
+  const effectiveTotalBersih = useMemo(() => {
+    return effectiveTotalKotor - totalPotongan;
+  }, [effectiveTotalKotor, totalPotongan]);
+
+  const sisaInvSebelumnyaVal = useMemo(() => {
+    return Number(sisaInvSebelumnyaInput) || 0;
+  }, [sisaInvSebelumnyaInput]);
+
+  const grandTotalKeseluruhan = useMemo(() => {
+    return effectiveTotalBersih + sisaInvSebelumnyaVal;
+  }, [effectiveTotalBersih, sisaInvSebelumnyaVal]);
 
   const handleSelectAllTrips = () => {
     if (filteredTrips.length === selectedTripsForInvoice.length) {
@@ -267,10 +320,16 @@ export default function Invoices() {
           proyek_id: Number(proyekId),
           owner_id: Number(ownerId),
           total_kubikasi: totalVolume,
-          total_harga_kotor: totalKotor,
+          volume_ditagih: volumeDitagihVal,
+          sisa_volume: sisaVolumeVal,
+          harga_per_kubik: effectiveHargaPerKubik,
+          is_custom_total: totalKotorInput !== '' || hargaPerKubikInput !== '',
+          total_harga_kotor: effectiveTotalKotor,
           is_potong_material: totalPotongan > 0 ? 1 : 0,
           total_potongan_material: totalPotongan,
-          total_harga_bersih: totalBersih,
+          total_harga_bersih: effectiveTotalBersih,
+          sisa_invoice_sebelumnya: sisaInvSebelumnyaVal,
+          total_keseluruhan: grandTotalKeseluruhan,
           kepada_custom: kepadaCustom || undefined,
           nama_ttd: namaTtd || undefined,
         });
@@ -294,10 +353,16 @@ export default function Invoices() {
           proyek_id: Number(proyekId),
           owner_id: Number(ownerId),
           total_kubikasi: totalVolume,
-          total_harga_kotor: totalKotor,
+          volume_ditagih: volumeDitagihVal,
+          sisa_volume: sisaVolumeVal,
+          harga_per_kubik: effectiveHargaPerKubik,
+          is_custom_total: totalKotorInput !== '' || hargaPerKubikInput !== '',
+          total_harga_kotor: effectiveTotalKotor,
           is_potong_material: totalPotongan > 0 ? 1 : 0,
           total_potongan_material: totalPotongan,
-          total_harga_bersih: totalBersih,
+          total_harga_bersih: effectiveTotalBersih,
+          sisa_invoice_sebelumnya: sisaInvSebelumnyaVal,
+          total_keseluruhan: grandTotalKeseluruhan,
           kepada_custom: kepadaCustom || undefined,
           nama_ttd: namaTtd || undefined,
           status: 'draft',
@@ -320,6 +385,10 @@ export default function Invoices() {
       setKepadaCustom('');
       setFilterMulai('');
       setFilterAkhir('');
+      setVolumeDitagihInput('');
+      setHargaPerKubikInput('');
+      setTotalKotorInput('');
+      setSisaInvSebelumnyaInput('');
       setSelectedTripsForInvoice([]);
       setEditInvId(null);
     } catch {
@@ -383,6 +452,10 @@ export default function Invoices() {
     setTglInvoice(format(new Date(inv.tanggal_invoice), 'yyyy-MM-dd'));
     setKepadaCustom(inv.kepada_custom || '');
     setNamaTtd(inv.nama_ttd || '');
+    setVolumeDitagihInput(inv.volume_ditagih !== undefined ? inv.volume_ditagih.toString() : '');
+    setHargaPerKubikInput(inv.harga_per_kubik !== undefined ? inv.harga_per_kubik.toString() : '');
+    setTotalKotorInput(inv.is_custom_total ? inv.total_harga_kotor.toString() : '');
+    setSisaInvSebelumnyaInput(inv.sisa_invoice_sebelumnya !== undefined ? inv.sisa_invoice_sebelumnya.toString() : '');
     
     const invTrips = await db.trips.filter(t => t.invoice_id === inv.id && t.isDeleted === 0).toArray();
     setSelectedTripsForInvoice(invTrips.map(t => t.id!));
@@ -398,6 +471,10 @@ export default function Invoices() {
     setTglInvoice('');
     setKepadaCustom('');
     setNamaTtd('');
+    setVolumeDitagihInput('');
+    setHargaPerKubikInput('');
+    setTotalKotorInput('');
+    setSisaInvSebelumnyaInput('');
     setSelectedTripsForInvoice([]);
     setActiveTab('data');
   };
@@ -682,36 +759,117 @@ export default function Invoices() {
                      </div>
                    </div>
 
-                 <div className="p-4 bg-muted/50 rounded-md border">
-                   <h3 className="font-semibold mb-4 text-lg">Ringkasan & Potongan Material</h3>
-                   
-                   <div className="grid grid-cols-2 gap-4 mb-6">
-                     <div className="p-4 bg-background border rounded shadow-sm">
-                       <p className="text-sm text-muted-foreground">Total Trip Dipilih</p>
-                       <p className="text-2xl font-bold">{selectedTripsForInvoice.length} Rit</p>
-                     </div>
-                     <div className="p-4 bg-background border rounded shadow-sm">
-                       <p className="text-sm text-muted-foreground">Total Kubikasi</p>
-                       <p className="text-2xl font-bold">{totalVolume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} M³</p>
-                     </div>
-                     <div className="col-span-2 p-4 bg-background border rounded shadow-sm">
-                       <p className="text-sm text-muted-foreground">Harga Kotor</p>
-                       <p className="text-2xl font-bold text-primary">Rp {totalKotor.toLocaleString('id-ID')}</p>
-                     </div>
-                   </div>
+                 <div className="p-4 bg-muted/50 rounded-md border space-y-4">
+                    <h3 className="font-semibold text-lg">Rincian & Custom Tagihan Invoice</h3>
 
-                   {editInvId && (
-                     <div className="bg-amber-100 text-amber-900 p-3 rounded text-sm mb-4">
-                       Sedang mengedit Invoice: <strong>{nomorInvoice}</strong>
-                     </div>
-                   )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Volume Section */}
+                      <div className="p-4 bg-background border rounded-lg space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Total Volume Terpilih ({selectedTripsForInvoice.length} Rit)</span>
+                          <span className="font-bold text-base">{totalVolume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} M³</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Volume Ditagihkan Saat Ini (M³)</Label>
+                          <Input 
+                            type="number"
+                            placeholder={totalVolume.toString()}
+                            value={volumeDitagihInput}
+                            onChange={e => setVolumeDitagihInput(e.target.value)}
+                          />
+                          {sisaVolumeVal > 0 && (
+                            <p className="text-xs text-amber-600 font-semibold bg-amber-50 dark:bg-amber-950/30 p-2 rounded border border-amber-200">
+                              ⚠️ Sisa Volume untuk Inv Selanjutnya: <strong>{sisaVolumeVal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} M³</strong>
+                            </p>
+                          )}
+                        </div>
+                      </div>
 
-                   <div className="flex justify-between items-center p-4 bg-primary/10 border border-primary/20 rounded">
-                     <span className="font-semibold">Total Bersih yang Ditagihkan:</span>
-                     <span className="text-2xl font-bold text-primary">Rp {totalBersih.toLocaleString('id-ID')}</span>
-                   </div>
+                      {/* Pricing Section */}
+                      <div className="p-4 bg-background border rounded-lg space-y-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Manual Harga per Kubik (Rp / M³)</Label>
+                          <Input 
+                            type="number"
+                            placeholder={`Default: Rp ${(volumeDitagihVal > 0 ? Math.round(totalKotor / totalVolume || 0) : 0).toLocaleString('id-ID')}`}
+                            value={hargaPerKubikInput}
+                            onChange={e => {
+                              setHargaPerKubikInput(e.target.value);
+                              setTotalKotorInput('');
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Atau Edit Total Harga Kotor Direct (Rp)</Label>
+                          <Input 
+                            type="number"
+                            placeholder={`Default: Rp ${totalKotor.toLocaleString('id-ID')}`}
+                            value={totalKotorInput}
+                            onChange={e => {
+                              setTotalKotorInput(e.target.value);
+                              setHargaPerKubikInput('');
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
 
-                    <div className="flex justify-end gap-2 mt-4">
+                    {/* Deductions & Prev Balance Section */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 bg-background border rounded-lg space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Potongan Material (UG Only)</span>
+                          <span className="text-red-500 font-bold">- Rp {totalPotongan.toLocaleString('id-ID')}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          * Potongan material hanya dihitung untuk trip dengan jenis jasa <strong>UG (Upah Gendong)</strong>. Jasa <strong>INCLUDE</strong> bernilai Rp 0 potongan.
+                        </p>
+                      </div>
+
+                      <div className="p-4 bg-background border rounded-lg space-y-1.5">
+                        <Label className="text-xs font-medium text-muted-foreground">Sisa / Tunggakan Invoice Sebelumnya (Rp)</Label>
+                        <Input 
+                          type="number"
+                          placeholder="0"
+                          value={sisaInvSebelumnyaInput}
+                          onChange={e => setSisaInvSebelumnyaInput(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Financial Summary Card */}
+                    <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg space-y-2">
+                      <div className="flex justify-between items-center text-sm">
+                        <span>Subtotal (Harga Kotor Invoice Ini):</span>
+                        <span className="font-semibold">Rp {effectiveTotalKotor.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm text-red-600">
+                        <span>Potongan Material:</span>
+                        <span className="font-semibold">- Rp {totalPotongan.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm pt-1 border-t border-primary/20">
+                        <span>Total Net Invoice Ini:</span>
+                        <span className="font-bold">Rp {effectiveTotalBersih.toLocaleString('id-ID')}</span>
+                      </div>
+                      {sisaInvSebelumnyaVal > 0 && (
+                        <div className="flex justify-between items-center text-sm text-amber-700 font-medium">
+                          <span>+ Sisa Inv Sebelumnya:</span>
+                          <span>Rp {sisaInvSebelumnyaVal.toLocaleString('id-ID')}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center text-lg font-extrabold text-primary pt-2 border-t-2 border-primary/30">
+                        <span>TOTAL KESELURUHAN (GRAND TOTAL):</span>
+                        <span>Rp {grandTotalKeseluruhan.toLocaleString('id-ID')}</span>
+                      </div>
+                    </div>
+
+                    {editInvId && (
+                      <div className="bg-amber-100 text-amber-900 p-3 rounded text-sm">
+                        Sedang mengedit Invoice: <strong>{nomorInvoice}</strong>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end gap-2 pt-2">
                       {editInvId && (
                         <Button variant="outline" onClick={handleCancelEdit}>Batal Edit</Button>
                       )}
@@ -719,7 +877,7 @@ export default function Invoices() {
                         <FileText className="w-4 h-4 mr-2" /> {editInvId ? 'Update Invoice' : 'Simpan Invoice Final'}
                       </Button>
                     </div>
-                 </div>
+                  </div>
                  </div>
                )}
             </CardContent>
