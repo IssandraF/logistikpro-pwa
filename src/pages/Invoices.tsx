@@ -68,7 +68,7 @@ export default function Invoices() {
   const [volumeDitagihInput, setVolumeDitagihInput] = useState('');
   const [hargaPerKubikInput, setHargaPerKubikInput] = useState('');
   const [totalKotorInput, setTotalKotorInput] = useState('');
-  const [sisaInvSebelumnyaInput, setSisaInvSebelumnyaInput] = useState('');
+  const [sisaVolSebelumnyaInput, setSisaVolSebelumnyaInput] = useState('');
 
   // Print States
   const [printModalOpen, setPrintModalOpen] = useState(false);
@@ -87,6 +87,8 @@ export default function Invoices() {
   
   const [paperSize, setPaperSize] = useState('A4 portrait');
   const [printScale, setPrintScale] = useState(100);
+  const [invoiceTemplate, setInvoiceTemplate] = useState<'standard' | 'classic'>('standard');
+  const [accentColor, setAccentColor] = useState<string>('#00B0F0');
 
   // Memoized Daily Invoice Calculations
   const filteredDailyTimesheets = useMemo(() => {
@@ -233,40 +235,44 @@ export default function Invoices() {
     return Math.max(0, totalVolume - volumeDitagihVal);
   }, [totalVolume, volumeDitagihVal]);
 
+  const sisaVolSebelumnyaVal = useMemo(() => {
+    return Number(sisaVolSebelumnyaInput) || 0;
+  }, [sisaVolSebelumnyaInput]);
+
+  const totalVolumeDitagihkanTotal = useMemo(() => {
+    return volumeDitagihVal + sisaVolSebelumnyaVal;
+  }, [volumeDitagihVal, sisaVolSebelumnyaVal]);
+
   const effectiveTotalKotor = useMemo(() => {
     if (totalKotorInput !== '' && !isNaN(Number(totalKotorInput))) {
       return Number(totalKotorInput);
     }
     if (hargaPerKubikInput !== '' && !isNaN(Number(hargaPerKubikInput))) {
-      return volumeDitagihVal * Number(hargaPerKubikInput);
+      return totalVolumeDitagihkanTotal * Number(hargaPerKubikInput);
     }
-    if (totalVolume > 0 && volumeDitagihVal !== totalVolume) {
-      return (totalKotor / totalVolume) * volumeDitagihVal;
+    if (totalVolume > 0 && totalVolumeDitagihkanTotal !== totalVolume) {
+      return (totalKotor / totalVolume) * totalVolumeDitagihkanTotal;
     }
     return totalKotor;
-  }, [totalKotorInput, hargaPerKubikInput, volumeDitagihVal, totalVolume, totalKotor]);
+  }, [totalKotorInput, hargaPerKubikInput, totalVolumeDitagihkanTotal, totalVolume, totalKotor]);
 
   const effectiveHargaPerKubik = useMemo(() => {
     if (hargaPerKubikInput !== '' && !isNaN(Number(hargaPerKubikInput))) {
       return Number(hargaPerKubikInput);
     }
-    if (volumeDitagihVal > 0) {
-      return effectiveTotalKotor / volumeDitagihVal;
+    if (totalVolumeDitagihkanTotal > 0) {
+      return effectiveTotalKotor / totalVolumeDitagihkanTotal;
     }
     return 0;
-  }, [hargaPerKubikInput, effectiveTotalKotor, volumeDitagihVal]);
+  }, [hargaPerKubikInput, effectiveTotalKotor, totalVolumeDitagihkanTotal]);
 
   const effectiveTotalBersih = useMemo(() => {
     return effectiveTotalKotor - totalPotongan;
   }, [effectiveTotalKotor, totalPotongan]);
 
-  const sisaInvSebelumnyaVal = useMemo(() => {
-    return Number(sisaInvSebelumnyaInput) || 0;
-  }, [sisaInvSebelumnyaInput]);
-
   const grandTotalKeseluruhan = useMemo(() => {
-    return effectiveTotalBersih + sisaInvSebelumnyaVal;
-  }, [effectiveTotalBersih, sisaInvSebelumnyaVal]);
+    return effectiveTotalBersih;
+  }, [effectiveTotalBersih]);
 
   const handleSelectAllTrips = () => {
     if (filteredTrips.length === selectedTripsForInvoice.length) {
@@ -322,13 +328,13 @@ export default function Invoices() {
           total_kubikasi: totalVolume,
           volume_ditagih: volumeDitagihVal,
           sisa_volume: sisaVolumeVal,
+          sisa_volume_sebelumnya: sisaVolSebelumnyaVal,
           harga_per_kubik: effectiveHargaPerKubik,
           is_custom_total: totalKotorInput !== '' || hargaPerKubikInput !== '',
           total_harga_kotor: effectiveTotalKotor,
           is_potong_material: totalPotongan > 0 ? 1 : 0,
           total_potongan_material: totalPotongan,
           total_harga_bersih: effectiveTotalBersih,
-          sisa_invoice_sebelumnya: sisaInvSebelumnyaVal,
           total_keseluruhan: grandTotalKeseluruhan,
           kepada_custom: kepadaCustom || undefined,
           nama_ttd: namaTtd || undefined,
@@ -355,13 +361,13 @@ export default function Invoices() {
           total_kubikasi: totalVolume,
           volume_ditagih: volumeDitagihVal,
           sisa_volume: sisaVolumeVal,
+          sisa_volume_sebelumnya: sisaVolSebelumnyaVal,
           harga_per_kubik: effectiveHargaPerKubik,
           is_custom_total: totalKotorInput !== '' || hargaPerKubikInput !== '',
           total_harga_kotor: effectiveTotalKotor,
           is_potong_material: totalPotongan > 0 ? 1 : 0,
           total_potongan_material: totalPotongan,
           total_harga_bersih: effectiveTotalBersih,
-          sisa_invoice_sebelumnya: sisaInvSebelumnyaVal,
           total_keseluruhan: grandTotalKeseluruhan,
           kepada_custom: kepadaCustom || undefined,
           nama_ttd: namaTtd || undefined,
@@ -386,9 +392,9 @@ export default function Invoices() {
       setFilterMulai('');
       setFilterAkhir('');
       setVolumeDitagihInput('');
+      setSisaVolSebelumnyaInput('');
       setHargaPerKubikInput('');
       setTotalKotorInput('');
-      setSisaInvSebelumnyaInput('');
       setSelectedTripsForInvoice([]);
       setEditInvId(null);
     } catch {
@@ -453,9 +459,9 @@ export default function Invoices() {
     setKepadaCustom(inv.kepada_custom || '');
     setNamaTtd(inv.nama_ttd || '');
     setVolumeDitagihInput(inv.volume_ditagih !== undefined ? inv.volume_ditagih.toString() : '');
+    setSisaVolSebelumnyaInput(inv.sisa_volume_sebelumnya !== undefined ? inv.sisa_volume_sebelumnya.toString() : '');
     setHargaPerKubikInput(inv.harga_per_kubik !== undefined ? inv.harga_per_kubik.toString() : '');
     setTotalKotorInput(inv.is_custom_total ? inv.total_harga_kotor.toString() : '');
-    setSisaInvSebelumnyaInput(inv.sisa_invoice_sebelumnya !== undefined ? inv.sisa_invoice_sebelumnya.toString() : '');
     
     const invTrips = await db.trips.filter(t => t.invoice_id === inv.id && t.isDeleted === 0).toArray();
     setSelectedTripsForInvoice(invTrips.map(t => t.id!));
@@ -472,9 +478,9 @@ export default function Invoices() {
     setKepadaCustom('');
     setNamaTtd('');
     setVolumeDitagihInput('');
+    setSisaVolSebelumnyaInput('');
     setHargaPerKubikInput('');
     setTotalKotorInput('');
-    setSisaInvSebelumnyaInput('');
     setSelectedTripsForInvoice([]);
     setActiveTab('data');
   };
@@ -758,19 +764,18 @@ export default function Invoices() {
                        </table>
                      </div>
                    </div>
-
-                 <div className="p-4 bg-muted/50 rounded-md border space-y-4">
+                  <div className="p-4 bg-muted/50 rounded-md border space-y-4">
                     <h3 className="font-semibold text-lg">Rincian & Custom Tagihan Invoice</h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Volume Section */}
+                      {/* Volume Pengiriman Saat Ini */}
                       <div className="p-4 bg-background border rounded-lg space-y-3">
                         <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium">Total Volume Terpilih ({selectedTripsForInvoice.length} Rit)</span>
+                          <span className="text-sm font-medium">Pengiriman Terpilih ({selectedTripsForInvoice.length} Rit)</span>
                           <span className="font-bold text-base">{totalVolume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} M³</span>
                         </div>
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">Volume Ditagihkan Saat Ini (M³)</Label>
+                          <Label className="text-xs text-muted-foreground">Volume Ditagihkan dari Pengiriman Ini (M³)</Label>
                           <Input 
                             type="number"
                             placeholder={totalVolume.toString()}
@@ -785,13 +790,38 @@ export default function Invoices() {
                         </div>
                       </div>
 
+                      {/* Sisa Volume Sebelumnya */}
+                      <div className="p-4 bg-background border rounded-lg space-y-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold text-primary">+ Sisa Volume Inv Sebelumnya (M³)</Label>
+                          <Input 
+                            type="number"
+                            placeholder="0 (Misal: 150 M³ dari inv sebelumnya)"
+                            value={sisaVolSebelumnyaInput}
+                            onChange={e => setSisaVolSebelumnyaInput(e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Inputkan sisa volume (M³) dari invoice sebelumnya yang dimasukkan untuk ditagihkan pada invoice ini.
+                          </p>
+                        </div>
+                        {sisaVolSebelumnyaVal > 0 && (
+                          <div className="p-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 text-blue-800 text-xs rounded font-semibold flex justify-between">
+                            <span>TOTAL VOL DITAGIHKAN INVOICE INI:</span>
+                            <span>{totalVolumeDitagihkanTotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} M³</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Pricing & Deductions Section */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Pricing Section */}
                       <div className="p-4 bg-background border rounded-lg space-y-3">
                         <div className="space-y-1.5">
                           <Label className="text-xs text-muted-foreground">Manual Harga per Kubik (Rp / M³)</Label>
                           <Input 
                             type="number"
-                            placeholder={`Default: Rp ${(volumeDitagihVal > 0 ? Math.round(totalKotor / totalVolume || 0) : 0).toLocaleString('id-ID')}`}
+                            placeholder={`Default: Rp ${(totalVolumeDitagihkanTotal > 0 ? Math.round(totalKotor / totalVolume || 0) : 0).toLocaleString('id-ID')}`}
                             value={hargaPerKubikInput}
                             onChange={e => {
                               setHargaPerKubikInput(e.target.value);
@@ -812,10 +842,8 @@ export default function Invoices() {
                           />
                         </div>
                       </div>
-                    </div>
 
-                    {/* Deductions & Prev Balance Section */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Deductions Section */}
                       <div className="p-4 bg-background border rounded-lg space-y-2">
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium">Potongan Material (UG Only)</span>
@@ -825,20 +853,14 @@ export default function Invoices() {
                           * Potongan material hanya dihitung untuk trip dengan jenis jasa <strong>UG (Upah Gendong)</strong>. Jasa <strong>INCLUDE</strong> bernilai Rp 0 potongan.
                         </p>
                       </div>
-
-                      <div className="p-4 bg-background border rounded-lg space-y-1.5">
-                        <Label className="text-xs font-medium text-muted-foreground">Sisa / Tunggakan Invoice Sebelumnya (Rp)</Label>
-                        <Input 
-                          type="number"
-                          placeholder="0"
-                          value={sisaInvSebelumnyaInput}
-                          onChange={e => setSisaInvSebelumnyaInput(e.target.value)}
-                        />
-                      </div>
                     </div>
 
                     {/* Financial Summary Card */}
                     <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg space-y-2">
+                      <div className="flex justify-between items-center text-sm">
+                        <span>Total Volume Ditagihkan Keseluruhan:</span>
+                        <span className="font-bold">{totalVolumeDitagihkanTotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} M³</span>
+                      </div>
                       <div className="flex justify-between items-center text-sm">
                         <span>Subtotal (Harga Kotor Invoice Ini):</span>
                         <span className="font-semibold">Rp {effectiveTotalKotor.toLocaleString('id-ID')}</span>
@@ -847,18 +869,8 @@ export default function Invoices() {
                         <span>Potongan Material:</span>
                         <span className="font-semibold">- Rp {totalPotongan.toLocaleString('id-ID')}</span>
                       </div>
-                      <div className="flex justify-between items-center text-sm pt-1 border-t border-primary/20">
-                        <span>Total Net Invoice Ini:</span>
-                        <span className="font-bold">Rp {effectiveTotalBersih.toLocaleString('id-ID')}</span>
-                      </div>
-                      {sisaInvSebelumnyaVal > 0 && (
-                        <div className="flex justify-between items-center text-sm text-amber-700 font-medium">
-                          <span>+ Sisa Inv Sebelumnya:</span>
-                          <span>Rp {sisaInvSebelumnyaVal.toLocaleString('id-ID')}</span>
-                        </div>
-                      )}
                       <div className="flex justify-between items-center text-lg font-extrabold text-primary pt-2 border-t-2 border-primary/30">
-                        <span>TOTAL KESELURUHAN (GRAND TOTAL):</span>
+                        <span>TOTAL TAGIHAN BERSIH (GRAND TOTAL):</span>
                         <span>Rp {grandTotalKeseluruhan.toLocaleString('id-ID')}</span>
                       </div>
                     </div>
@@ -1032,43 +1044,76 @@ export default function Invoices() {
 
       {/* Print Modal */}
       <Dialog open={printModalOpen} onOpenChange={setPrintModalOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Cetak Invoice</DialogTitle>
             <DialogDescription>
               Invoice <strong>{invoiceToPrint?.nomor_invoice}</strong> siap dicetak.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex items-center gap-4 p-4 border rounded bg-muted/50">
-            <Button 
-              type="button" 
-              variant={includePhotos ? "default" : "outline"} 
-              onClick={() => setIncludePhotos(!includePhotos)}
-              className="w-full flex justify-center gap-2"
-            >
-              {includePhotos ? <CheckSquare className="w-4 h-4" /> : <ImageIcon className="w-4 h-4" />}
-              {includePhotos ? 'Foto Bukti DO Akan Dilampirkan' : 'Sertakan Foto Bukti DO?'}
-            </Button>
-          </div>
-          <div className="grid grid-cols-2 gap-4 mt-2">
-            <div className="space-y-2">
-              <Label>Ukuran Kertas</Label>
-              <Select value={paperSize} onValueChange={setPaperSize}>
-                <SelectTrigger><SelectValue placeholder="Pilih Ukuran" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="A4 portrait">A4 Portrait</SelectItem>
-                  <SelectItem value="A4 landscape">A4 Landscape</SelectItem>
-                  <SelectItem value="Legal portrait">Legal Portrait (F4)</SelectItem>
-                  <SelectItem value="Legal landscape">Legal Landscape</SelectItem>
-                </SelectContent>
-              </Select>
+          
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 p-3 border rounded bg-muted/50">
+              <Button 
+                type="button" 
+                variant={includePhotos ? "default" : "outline"} 
+                onClick={() => setIncludePhotos(!includePhotos)}
+                className="w-full flex justify-center gap-2"
+              >
+                {includePhotos ? <CheckSquare className="w-4 h-4" /> : <ImageIcon className="w-4 h-4" />}
+                {includePhotos ? 'Foto Bukti DO Akan Dilampirkan' : 'Sertakan Foto Bukti DO?'}
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label>Skala Cetak (%)</Label>
-              <Input type="number" min="50" max="150" value={printScale} onChange={(e) => setPrintScale(Number(e.target.value))} />
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Template Invoice</Label>
+                <Select value={invoiceTemplate} onValueChange={(val: any) => setInvoiceTemplate(val)}>
+                  <SelectTrigger><SelectValue placeholder="Pilih Template" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">Template 1 (Standar / Detail)</SelectItem>
+                    <SelectItem value="classic">Template 2 (Klasik / TAMPLATE_INV_2)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Warna Aksen</Label>
+                <Select value={accentColor} onValueChange={setAccentColor}>
+                  <SelectTrigger><SelectValue placeholder="Pilih Warna" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="#00B0F0">🔵 Biru Cyan</SelectItem>
+                    <SelectItem value="#f8cbad">🍑 Peach Warm (Classic)</SelectItem>
+                    <SelectItem value="#10b981">🟢 Hijau Emerald</SelectItem>
+                    <SelectItem value="#1e293b">🌑 Navy Dark</SelectItem>
+                    <SelectItem value="#e11d48">🔴 Merah Crimson</SelectItem>
+                    <SelectItem value="#f59e0b">🟡 Kuning Amber</SelectItem>
+                    <SelectItem value="#8b5cf6">🟣 Ungu Violet</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Ukuran Kertas</Label>
+                <Select value={paperSize} onValueChange={setPaperSize}>
+                  <SelectTrigger><SelectValue placeholder="Pilih Ukuran" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A4 portrait">A4 Portrait</SelectItem>
+                    <SelectItem value="A4 landscape">A4 Landscape</SelectItem>
+                    <SelectItem value="Legal portrait">Legal Portrait (F4)</SelectItem>
+                    <SelectItem value="Legal landscape">Legal Landscape</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Skala Cetak (%)</Label>
+                <Input type="number" min="50" max="150" value={printScale} onChange={(e) => setPrintScale(Number(e.target.value))} />
+              </div>
             </div>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="mt-2">
             <Button variant="outline" onClick={() => setPrintModalOpen(false)}>Batal</Button>
             <Button onClick={executePrint}><Printer className="w-4 h-4 mr-2" /> Proses Cetak PDF</Button>
           </DialogFooter>
@@ -1078,8 +1123,34 @@ export default function Invoices() {
       {/* Preview Modal */}
       <Dialog open={previewModalOpen} onOpenChange={setPreviewModalOpen}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto bg-gray-100">
-          <DialogHeader className="mb-4">
-            <DialogTitle>Preview Invoice {invoiceToPrint?.nomor_invoice}</DialogTitle>
+          <DialogHeader className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2 border-b pb-3">
+            <div>
+              <DialogTitle>Preview Invoice {invoiceToPrint?.nomor_invoice}</DialogTitle>
+              <DialogDescription className="text-xs mt-0.5">Ubah template dan warna aksen secara langsung di bawah ini</DialogDescription>
+            </div>
+            {invoiceToPrint?.tipe_invoice !== 'harian' && (
+              <div className="flex gap-2">
+                <Select value={invoiceTemplate} onValueChange={(val: any) => setInvoiceTemplate(val)}>
+                  <SelectTrigger className="w-[200px] bg-white"><SelectValue placeholder="Pilih Template" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">Template 1 (Standar)</SelectItem>
+                    <SelectItem value="classic">Template 2 (Klasik TAMPLATE_INV_2)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={accentColor} onValueChange={setAccentColor}>
+                  <SelectTrigger className="w-[160px] bg-white"><SelectValue placeholder="Warna Aksen" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="#00B0F0">🔵 Biru Cyan</SelectItem>
+                    <SelectItem value="#f8cbad">🍑 Peach Warm</SelectItem>
+                    <SelectItem value="#10b981">🟢 Hijau Emerald</SelectItem>
+                    <SelectItem value="#1e293b">🌑 Navy Dark</SelectItem>
+                    <SelectItem value="#e11d48">🔴 Merah Crimson</SelectItem>
+                    <SelectItem value="#f59e0b">🟡 Kuning Amber</SelectItem>
+                    <SelectItem value="#8b5cf6">🟣 Ungu Violet</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </DialogHeader>
           
           <div className="bg-white rounded shadow-sm border border-gray-200">
@@ -1111,6 +1182,8 @@ export default function Invoices() {
                     paperSize={paperSize}
                     printScale={printScale}
                     isPreview={true}
+                    templateType={invoiceTemplate}
+                    accentColor={accentColor}
                   />
                 )
              )}
@@ -1150,6 +1223,8 @@ export default function Invoices() {
             includePhotos={includePhotos}
             paperSize={paperSize}
             printScale={printScale}
+            templateType={invoiceTemplate}
+            accentColor={accentColor}
           />
         )
       )}

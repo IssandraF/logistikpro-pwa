@@ -87,29 +87,31 @@ export async function exportInvoiceExcel(
   // Totals
   mainAoa.push([]);
   const billedVol = invoice.volume_ditagih ?? invoice.total_kubikasi;
-  if (invoice.volume_ditagih !== undefined && invoice.sisa_volume !== undefined && invoice.sisa_volume > 0) {
-    mainAoa.push(['VOLUME TERPILIH', '', '', '', `${trips.length} Rit`, invoice.total_kubikasi, '', '']);
-    mainAoa.push(['VOLUME DITAGIHKAN INVOICE INI', '', '', '', '', billedVol, '', '']);
-    mainAoa.push(['SISA VOLUME (INV SELANJUTNYA)', '', '', '', '', invoice.sisa_volume, '', '']);
+  const prevVol = invoice.sisa_volume_sebelumnya ?? 0;
+  const totalBilledVol = billedVol + prevVol;
+
+  if (invoice.volume_ditagih !== undefined || prevVol > 0) {
+    mainAoa.push(['VOLUME PENGIRIMAN INI', '', '', '', `${trips.length} Rit`, invoice.total_kubikasi, '', '']);
+    mainAoa.push(['VOLUME DITAGIH PENGIRIMAN INI', '', '', '', '', billedVol, '', '']);
+    if (invoice.sisa_volume !== undefined && invoice.sisa_volume > 0) {
+      mainAoa.push(['SISA VOLUME (INV SELANJUTNYA)', '', '', '', '', invoice.sisa_volume, '', '']);
+    }
+    if (prevVol > 0) {
+      mainAoa.push(['SISA VOLUME INV SEBELUMNYA', '', '', '', '', prevVol, '', '']);
+    }
+    mainAoa.push(['TOTAL VOLUME DITAGIHKAN INVOICE INI', '', '', '', '', totalBilledVol, '', '']);
   }
 
   if (invoice.is_potong_material === 1) {
-    mainAoa.push(['TOTAL HARGA KOTOR', '', '', '', `${trips.length} Rit`, billedVol, '', invoice.total_harga_kotor]);
+    mainAoa.push(['TOTAL HARGA KOTOR', '', '', '', '', totalBilledVol, '', invoice.total_harga_kotor]);
     mainAoa.push(['POTONGAN MATERIAL', '', '', '', '', '', '', -invoice.total_potongan_material]);
     mainAoa.push(['TOTAL NILAI PO (BERSIH)', '', '', '', '', '', '', invoice.total_harga_bersih]);
   } else {
-    mainAoa.push(['TOTAL NILAI PO', '', '', '', `${trips.length} Rit`, billedVol, '', invoice.total_harga_kotor]);
+    mainAoa.push(['TOTAL NILAI PO', '', '', '', '', totalBilledVol, '', invoice.total_harga_kotor]);
   }
-
-  if (invoice.sisa_invoice_sebelumnya !== undefined && invoice.sisa_invoice_sebelumnya > 0) {
-    mainAoa.push(['SISA INVOICE SEBELUMNYA', '', '', '', '', '', '', invoice.sisa_invoice_sebelumnya]);
-  }
-
-  const grandTotal = invoice.total_keseluruhan ?? invoice.total_harga_bersih;
-  mainAoa.push(['TOTAL KESELURUHAN DIBAYAR', '', '', '', '', '', '', grandTotal]);
 
   mainAoa.push([]);
-  mainAoa.push([`TERBILANG: # ${formatTerbilang(grandTotal).toUpperCase().trim()} RUPIAH #`]);
+  mainAoa.push([`TERBILANG: # ${formatTerbilang(invoice.total_harga_bersih).toUpperCase().trim()} RUPIAH #`]);
   mainAoa.push([]);
   mainAoa.push(['Pembayaran dapat ditransfer melalui:']);
   mainAoa.push([`Bank        : ${owner.nama_bank}`]);

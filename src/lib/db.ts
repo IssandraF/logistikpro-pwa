@@ -120,6 +120,7 @@ export interface Invoice {
   rekening_bank?: string;
   volume_ditagih?: number;
   sisa_volume?: number;
+  sisa_volume_sebelumnya?: number;
   harga_per_kubik?: number;
   is_custom_total?: boolean;
   sisa_invoice_sebelumnya?: number;
