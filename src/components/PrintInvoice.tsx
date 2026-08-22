@@ -196,7 +196,7 @@ export default function PrintInvoice({
                   ).toLocaleString('id-ID')}
                 </td>
                 <td className="border border-black py-3 px-2 text-right font-bold">
-                  {invoice.total_harga_kotor.toLocaleString('id-ID')}
+                  {(invoice.total_harga_kotor - (invoice.sisa_volume_sebelumnya ? invoice.sisa_volume_sebelumnya * (invoice.harga_per_kubik || 0) : 0)).toLocaleString('id-ID')}
                 </td>
               </tr>
 
@@ -286,11 +286,13 @@ export default function PrintInvoice({
               </table>
             </div>
 
-            <div className="w-[200px] text-center flex flex-col items-center justify-between">
+            {/* Tanda Tangan */}
+            <div className="w-[220px] text-center mt-2">
               <div className="text-[10px] mb-1">
                 {format(new Date(invoice.tanggal_invoice), 'dd MMMM yyyy', { locale: id })}
               </div>
-              <div className="font-semibold text-[10px] mb-10">Hormat Kami,</div>
+              <div className="font-semibold text-[10px]">Hormat Kami,</div>
+              <br /><br /><br /><br />
               <div className="border-t border-black w-full pt-1 font-bold text-[10px]">
                 {(invoice.nama_ttd || owner.nama).toUpperCase()}
               </div>

@@ -33,10 +33,15 @@ export default function Invoices() {
   const proyeks = useLiveQuery(() => db.proyeks.where('isDeleted').equals(0).toArray());
   const jenisJasas = useLiveQuery(() => db.jenisJasas.where('isDeleted').equals(0).toArray());
   const jenisMaterials = useLiveQuery(() => db.jenisMaterials.where('isDeleted').equals(0).toArray());
-  const pendingTripsQuery = useLiveQuery(() => db.trips.filter(t => !t.invoice_id && t.isDeleted === 0).toArray());
+  const [kategoriInvoice, setKategoriInvoice] = useState<'agen' | 'proyek'>('agen');
+
+  const pendingTripsQuery = useLiveQuery(
+    () => db.trips.filter(t => (kategoriInvoice === 'agen' ? !t.invoice_id : !t.invoice_proyek_id) && t.isDeleted === 0).toArray(),
+    [kategoriInvoice]
+  );
   const editingTripsQuery = useLiveQuery(
-    async () => editInvId ? await db.trips.filter(t => t.invoice_id === editInvId && t.isDeleted === 0).toArray() : [],
-    [editInvId]
+    async () => editInvId ? await db.trips.filter(t => (kategoriInvoice === 'agen' ? t.invoice_id === editInvId : t.invoice_proyek_id === editInvId) && t.isDeleted === 0).toArray() : [],
+    [editInvId, kategoriInvoice]
   );
   const allAvailableTrips = useMemo(() => {
     return [...(pendingTripsQuery || []), ...(editingTripsQuery || [])];
@@ -77,7 +82,7 @@ export default function Invoices() {
   const [invoiceToPrint, setInvoiceToPrint] = useState<any>(null);
   const [includePhotos, setIncludePhotos] = useState(false);
   const tripsForPrint = useLiveQuery(
-    () => invoiceToPrint && invoiceToPrint.tipe_invoice !== 'harian' ? db.trips.where('invoice_id').equals(invoiceToPrint.id).toArray() : Promise.resolve([]),
+    () => invoiceToPrint && invoiceToPrint.tipe_invoice !== 'harian' ? db.trips.filter(t => invoiceToPrint.kategori_invoice === 'proyek' ? t.invoice_proyek_id === invoiceToPrint.id : t.invoice_id === invoiceToPrint.id).toArray() : Promise.resolve([]),
     [invoiceToPrint]
   );
   const timesheetsForPrint = useLiveQuery(
@@ -214,6 +219,7 @@ export default function Invoices() {
   }, [proyekId, allAvailableTrips, proyekLokasis, filterAkhir, filterMulai, selectedTripsForInvoice]);
 
   const totalPotongan = useMemo(() => {
+    if (kategoriInvoice === 'proyek') return 0; // Tidak ada potongan UG untuk invoice proyek
     return filteredTrips
       .filter(t => selectedTripsForInvoice.includes(t.id!))
       .reduce((sum, t) => {
@@ -222,7 +228,7 @@ export default function Invoices() {
         if (!isUg) return sum;
         return sum + (t.potongan_material_invoice || 0);
       }, 0);
-  }, [filteredTrips, selectedTripsForInvoice, jenisJasas]);
+  }, [filteredTrips, selectedTripsForInvoice, jenisJasas, kategoriInvoice]);
 
   const volumeDitagihVal = useMemo(() => {
     if (volumeDitagihInput !== '' && !isNaN(Number(volumeDitagihInput))) {
@@ -231,13 +237,13 @@ export default function Invoices() {
     return totalVolume;
   }, [volumeDitagihInput, totalVolume]);
 
-  const sisaVolumeVal = useMemo(() => {
-    return Math.max(0, totalVolume - volumeDitagihVal);
-  }, [totalVolume, volumeDitagihVal]);
-
   const sisaVolSebelumnyaVal = useMemo(() => {
     return Number(sisaVolSebelumnyaInput) || 0;
   }, [sisaVolSebelumnyaInput]);
+
+  const sisaVolumeVal = useMemo(() => {
+    return Math.max(0, totalVolume + sisaVolSebelumnyaVal - volumeDitagihVal);
+  }, [totalVolume, sisaVolSebelumnyaVal, volumeDitagihVal]);
 
   const totalVolumeDitagihkanTotal = useMemo(() => {
     return volumeDitagihVal + sisaVolSebelumnyaVal;
@@ -336,6 +342,7 @@ export default function Invoices() {
           total_potongan_material: totalPotongan,
           total_harga_bersih: effectiveTotalBersih,
           total_keseluruhan: grandTotalKeseluruhan,
+          kategori_invoice: kategoriInvoice,
           kepada_custom: kepadaCustom || undefined,
           nama_ttd: namaTtd || undefined,
         });
@@ -345,10 +352,18 @@ export default function Invoices() {
         const oldIds = oldTrips.map(t => t.id!);
         const unselected = oldIds.filter(id => !selectedTripsForInvoice.includes(id));
         if (unselected.length > 0) {
-          await db.trips.where('id').anyOf(unselected).modify({ invoice_id: null });
+          if (kategoriInvoice === 'agen') {
+            await db.trips.where('id').anyOf(unselected).modify({ invoice_id: null });
+          } else {
+            await db.trips.where('id').anyOf(unselected).modify({ invoice_proyek_id: null });
+          }
         }
         // Update newly selected
-        await db.trips.where('id').anyOf(selectedTripsForInvoice).modify({ invoice_id: editInvId });
+        if (kategoriInvoice === 'agen') {
+          await db.trips.where('id').anyOf(selectedTripsForInvoice).modify({ invoice_id: editInvId });
+        } else {
+          await db.trips.where('id').anyOf(selectedTripsForInvoice).modify({ invoice_proyek_id: editInvId });
+        }
 
         toast.success('Invoice berhasil diupdate!');
       } else {
@@ -369,6 +384,7 @@ export default function Invoices() {
           total_potongan_material: totalPotongan,
           total_harga_bersih: effectiveTotalBersih,
           total_keseluruhan: grandTotalKeseluruhan,
+          kategori_invoice: kategoriInvoice,
           kepada_custom: kepadaCustom || undefined,
           nama_ttd: namaTtd || undefined,
           status: 'draft',
@@ -376,7 +392,11 @@ export default function Invoices() {
         });
 
         // 2. Update Trips
-        await db.trips.where('id').anyOf(selectedTripsForInvoice).modify({ invoice_id: Number(invoiceId) });
+        if (kategoriInvoice === 'agen') {
+          await db.trips.where('id').anyOf(selectedTripsForInvoice).modify({ invoice_id: Number(invoiceId) });
+        } else {
+          await db.trips.where('id').anyOf(selectedTripsForInvoice).modify({ invoice_proyek_id: Number(invoiceId) });
+        }
 
         toast.success('Invoice berhasil dibuat!');
       }
@@ -404,7 +424,7 @@ export default function Invoices() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const exportExcelSingle = async (inv: any) => {
-    const invTrips = await db.trips.where('invoice_id').equals(inv.id).toArray();
+    const invTrips = await db.trips.filter(t => inv.kategori_invoice === 'proyek' ? t.invoice_proyek_id === inv.id : t.invoice_id === inv.id).toArray();
     const owner = owners?.find(o => o.id === inv.owner_id);
     const proyek = proyeks?.find(p => p.id === inv.proyek_id);
     
@@ -434,11 +454,17 @@ export default function Invoices() {
             await db.dailyTimesheets.update(ts.id!, { invoice_id: null });
           }
         } else {
-          const trips = await db.trips.where('invoice_id').equals(inv.id).toArray();
+          const trips = await db.trips.filter(t => t.invoice_id === inv.id || t.invoice_proyek_id === inv.id).toArray();
           const tripIds = trips.map(t => t.id!);
           
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await db.trips.where('id').anyOf(tripIds).modify((t: any) => { t.invoice_id = null; });
+          await db.trips.where('id').anyOf(tripIds).modify((t: any) => { 
+            if (inv.kategori_invoice === 'proyek') {
+              t.invoice_proyek_id = null;
+            } else {
+              t.invoice_id = null; 
+            }
+          });
           await db.invoiceQuarryPrices.where('invoice_id').equals(inv.id).delete();
         }
         await db.invoices.delete(inv.id);
@@ -462,8 +488,9 @@ export default function Invoices() {
     setSisaVolSebelumnyaInput(inv.sisa_volume_sebelumnya !== undefined ? inv.sisa_volume_sebelumnya.toString() : '');
     setHargaPerKubikInput(inv.harga_per_kubik !== undefined ? inv.harga_per_kubik.toString() : '');
     setTotalKotorInput(inv.is_custom_total ? inv.total_harga_kotor.toString() : '');
+    setKategoriInvoice(inv.kategori_invoice || 'agen');
     
-    const invTrips = await db.trips.filter(t => t.invoice_id === inv.id && t.isDeleted === 0).toArray();
+    const invTrips = await db.trips.filter(t => (inv.kategori_invoice === 'proyek' ? t.invoice_proyek_id === inv.id : t.invoice_id === inv.id) && t.isDeleted === 0).toArray();
     setSelectedTripsForInvoice(invTrips.map(t => t.id!));
     
     setActiveTab('create');
@@ -489,6 +516,7 @@ export default function Invoices() {
   const handlePreviewClick = (inv: any) => {
     setInvoiceToPrint(inv);
     setIncludePhotos(true);
+    setInvoiceTemplate(inv.kategori_invoice === 'proyek' ? 'classic' : 'standard');
     setPreviewModalOpen(true);
   };
 
@@ -496,6 +524,7 @@ export default function Invoices() {
   const handlePrintClick = (inv: any) => {
     setInvoiceToPrint(inv);
     setIncludePhotos(false);
+    setInvoiceTemplate(inv.kategori_invoice === 'proyek' ? 'classic' : 'standard');
     setPrintModalOpen(true);
   };
 
@@ -634,6 +663,16 @@ export default function Invoices() {
             <CardHeader><CardTitle>Form Invoice Baru</CardTitle></CardHeader>
             <CardContent className="space-y-4">
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2 col-span-1 md:col-span-2">
+                  <Label>Kategori Penagihan</Label>
+                  <Select value={kategoriInvoice} onValueChange={(v: any) => setKategoriInvoice(v)}>
+                    <SelectTrigger><SelectValue placeholder="Pilih Kategori" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="agen">Internal / Agen (Template 1)</SelectItem>
+                      <SelectItem value="proyek">Eksternal / Proyek (Template 2)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-2">
                   <Label>Perusahaan Pengirim (Owner)</Label>
                   <Select value={ownerId} onValueChange={setOwnerId}>

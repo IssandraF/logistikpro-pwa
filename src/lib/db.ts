@@ -89,7 +89,8 @@ export interface Trip {
   tanggal_muat: Date;
   tanggal_bongkar: Date;
   bukti_do?: string; // base64 compressed image
-  invoice_id: number | null;
+  invoice_id: number | null; // Untuk penagihan agen/internal (Template 1)
+  invoice_proyek_id?: number | null; // Untuk penagihan proyek/eksternal (Template 2)
   slip_pembayaran_id: number | null;
   harga_bayar?: number; // diisi ketika dibuat slip pembayaran
   potongan_trip?: number; // potongan material per trip ketika dibuat slip
@@ -114,6 +115,7 @@ export interface Invoice {
   nama_ttd?: string;
   status: 'draft' | 'lunas';
   tipe_invoice?: 'trip' | 'harian';
+  kategori_invoice?: 'agen' | 'proyek'; // agen = Template 1, proyek = Template 2
   daily_contract_id?: number | null;
   total_pph?: number;
   pph_persen?: number;
@@ -284,6 +286,16 @@ class LogistikDatabase extends Dexie {
     }).upgrade(async (tx) => {
       return tx.table('kas').toCollection().modify(k => {
         k.is_closed = 0;
+      });
+    });
+
+    this.version(6).stores({
+      trips: '++id, grup_mobil_id, plat_nomor, proyek_lokasi_id, lokasi_kuari_id, invoice_id, invoice_proyek_id, slip_pembayaran_id, tanggal_bongkar, isDeleted',
+    }).upgrade(async (tx) => {
+      return tx.table('invoices').toCollection().modify(inv => {
+        if (!inv.kategori_invoice) {
+          inv.kategori_invoice = 'agen'; // Default data lama ke agen/internal
+        }
       });
     });
   }
