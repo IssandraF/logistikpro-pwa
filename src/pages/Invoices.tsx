@@ -63,11 +63,13 @@ export default function Invoices() {
   const [dtPphAktif, setDtPphAktif] = useState(true);
 
   const [nomorInvoice, setNomorInvoice] = useState('');
-  const [tglInvoice, setTglInvoice] = useState('');
-  const [proyekId, setProyekId] = useState('');
-  const [ownerId, setOwnerId] = useState('');
+  const [nomorInvoiceSebelumnyaInput, setNomorInvoiceSebelumnyaInput] = useState('');
+  const [tglInvoice, setTglInvoice] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [kepadaCustom, setKepadaCustom] = useState('');
   const [namaTtd, setNamaTtd] = useState('');
+  const [ttdImageInput, setTtdImageInput] = useState<string>('');
+  const [proyekId, setProyekId] = useState('');
+  const [ownerId, setOwnerId] = useState('');
 
   // Split Volume & Custom Price / Balance States
   const [volumeDitagihInput, setVolumeDitagihInput] = useState('');
@@ -242,12 +244,14 @@ export default function Invoices() {
   }, [sisaVolSebelumnyaInput]);
 
   const sisaVolumeVal = useMemo(() => {
-    return Math.max(0, totalVolume + sisaVolSebelumnyaVal - volumeDitagihVal);
+    // Sisa = (sisa sebelumnya + volume pengiriman ini) - total yang ditagihkan
+    return Math.max(0, (sisaVolSebelumnyaVal + totalVolume) - volumeDitagihVal);
   }, [totalVolume, sisaVolSebelumnyaVal, volumeDitagihVal]);
 
+  // volumeDitagihVal sudah termasuk sisa sebelumnya, jadi tidak perlu tambah lagi
   const totalVolumeDitagihkanTotal = useMemo(() => {
-    return volumeDitagihVal + sisaVolSebelumnyaVal;
-  }, [volumeDitagihVal, sisaVolSebelumnyaVal]);
+    return volumeDitagihVal;
+  }, [volumeDitagihVal]);
 
   const effectiveTotalKotor = useMemo(() => {
     if (totalKotorInput !== '' && !isNaN(Number(totalKotorInput))) {
@@ -345,6 +349,8 @@ export default function Invoices() {
           kategori_invoice: kategoriInvoice,
           kepada_custom: kepadaCustom || undefined,
           nama_ttd: namaTtd || undefined,
+          nomor_invoice_sebelumnya: nomorInvoiceSebelumnyaInput || undefined,
+          ttd_image: ttdImageInput || undefined
         });
         
         // Remove old trips
@@ -387,6 +393,8 @@ export default function Invoices() {
           kategori_invoice: kategoriInvoice,
           kepada_custom: kepadaCustom || undefined,
           nama_ttd: namaTtd || undefined,
+          nomor_invoice_sebelumnya: nomorInvoiceSebelumnyaInput || undefined,
+          ttd_image: ttdImageInput || undefined,
           status: 'draft',
           createdAt: new Date()
         });
@@ -406,9 +414,12 @@ export default function Invoices() {
       // Reset Form
       setProyekId('');
       setNomorInvoice('');
-      setTglInvoice('');
+      setNomorInvoiceSebelumnyaInput('');
+      setTglInvoice(format(new Date(), 'yyyy-MM-dd'));
       setMassUpdatePotongan('');
       setKepadaCustom('');
+      setNamaTtd('');
+      setTtdImageInput('');
       setFilterMulai('');
       setFilterAkhir('');
       setVolumeDitagihInput('');
@@ -484,6 +495,8 @@ export default function Invoices() {
     setTglInvoice(format(new Date(inv.tanggal_invoice), 'yyyy-MM-dd'));
     setKepadaCustom(inv.kepada_custom || '');
     setNamaTtd(inv.nama_ttd || '');
+    setTtdImageInput(inv.ttd_image || '');
+    setNomorInvoiceSebelumnyaInput(inv.nomor_invoice_sebelumnya || '');
     setVolumeDitagihInput(inv.volume_ditagih !== undefined ? inv.volume_ditagih.toString() : '');
     setSisaVolSebelumnyaInput(inv.sisa_volume_sebelumnya !== undefined ? inv.sisa_volume_sebelumnya.toString() : '');
     setHargaPerKubikInput(inv.harga_per_kubik !== undefined ? inv.harga_per_kubik.toString() : '');
@@ -501,10 +514,11 @@ export default function Invoices() {
     setProyekId('');
     setOwnerId('');
     setNomorInvoice('');
-    setTglInvoice('');
+    setNomorInvoiceSebelumnyaInput('');
+    setTglInvoice(format(new Date(), 'yyyy-MM-dd'));
     setKepadaCustom('');
     setNamaTtd('');
-    setVolumeDitagihInput('');
+    setTtdImageInput('');
     setSisaVolSebelumnyaInput('');
     setHargaPerKubikInput('');
     setTotalKotorInput('');
@@ -715,6 +729,20 @@ export default function Invoices() {
                   <Label>Penanda Tangan (Opsional)</Label>
                   <Input value={namaTtd} onChange={e => setNamaTtd(e.target.value)} placeholder="Misal: Bapak Budi" />
                 </div>
+                <div className="space-y-2">
+                  <Label>Upload Tanda Tangan (Gambar)</Label>
+                  <Input type="file" accept="image/*" onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onloadend = () => setTtdImageInput(reader.result as string);
+                      reader.readAsDataURL(file);
+                    } else {
+                      setTtdImageInput('');
+                    }
+                  }} />
+                  {ttdImageInput && <img src={ttdImageInput} alt="Preview TTD" className="h-12 object-contain mt-2 border p-1 rounded bg-white" />}
+                </div>
                </div>
 
                {proyekId && (
@@ -814,16 +842,17 @@ export default function Invoices() {
                           <span className="font-bold text-base">{totalVolume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} M³</span>
                         </div>
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground">Volume Ditagihkan dari Pengiriman Ini (M³)</Label>
+                          <Label className="text-xs text-muted-foreground">Total Volume Ditagihkan Invoice Ini (M³)</Label>
                           <Input 
                             type="number"
-                            placeholder={totalVolume.toString()}
+                            placeholder={`Default: ${(sisaVolSebelumnyaVal + totalVolume).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} (semua)`}
                             value={volumeDitagihInput}
                             onChange={e => setVolumeDitagihInput(e.target.value)}
                           />
                           {sisaVolumeVal > 0 && (
                             <p className="text-xs text-amber-600 font-semibold bg-amber-50 dark:bg-amber-950/30 p-2 rounded border border-amber-200">
-                              ⚠️ Sisa Volume untuk Inv Selanjutnya: <strong>{sisaVolumeVal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} M³</strong>
+                              ⚠️ Sisa untuk Invoice Berikutnya: <strong>{sisaVolumeVal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} M³</strong>
+                              <span className="block text-[10px] font-normal text-gray-500 mt-0.5">= ({sisaVolSebelumnyaVal.toLocaleString('id-ID')} + {totalVolume.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}) - {volumeDitagihVal.toLocaleString('id-ID')} M³</span>
                             </p>
                           )}
                         </div>
@@ -847,6 +876,16 @@ export default function Invoices() {
                           <div className="p-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 text-blue-800 text-xs rounded font-semibold flex justify-between">
                             <span>TOTAL VOL DITAGIHKAN INVOICE INI:</span>
                             <span>{totalVolumeDitagihkanTotal.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 3 })} M³</span>
+                          </div>
+                        )}
+                        {sisaVolSebelumnyaVal > 0 && (
+                          <div className="space-y-1.5 mt-2 border-t pt-3">
+                            <Label className="text-xs">Nomor Invoice Sebelumnya (Rujukan)</Label>
+                            <Input 
+                              placeholder="Misal: INV/2026/01"
+                              value={nomorInvoiceSebelumnyaInput}
+                              onChange={e => setNomorInvoiceSebelumnyaInput(e.target.value)}
+                            />
                           </div>
                         )}
                       </div>

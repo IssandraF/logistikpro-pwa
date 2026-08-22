@@ -127,6 +127,8 @@ export interface Invoice {
   is_custom_total?: boolean;
   sisa_invoice_sebelumnya?: number;
   total_keseluruhan?: number;
+  nomor_invoice_sebelumnya?: string;
+  ttd_image?: string;
   createdAt: Date;
 }
 

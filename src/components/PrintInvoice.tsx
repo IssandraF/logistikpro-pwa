@@ -175,49 +175,63 @@ export default function PrintInvoice({
               </tr>
             </thead>
             <tbody>
-              {/* Baris 1 — Pengiriman */}
-              <tr className="align-top">
+              {/* Baris 1 — Total Material Belum Ditagih (sisa sebelumnya + pengiriman ini) */}
+              {<tr className="align-top">
                 <td className="border border-black py-3 px-1 text-center">1</td>
                 <td className="border border-black py-3 px-2">
-                  <div className="font-bold">Pengiriman Material / Tanah Timbun</div>
+                  <div className="font-bold">Total Material Belum Ditagih</div>
                   <div className="text-[9px] text-gray-500 mt-0.5">
-                    {trips.length} Ritase &mdash; Vol. Total: {invoice.total_kubikasi.toLocaleString('id-ID')} M³
+                    {invoice.sisa_volume_sebelumnya && invoice.sisa_volume_sebelumnya > 0
+                      ? `Sisa Inv. No. ${invoice.nomor_invoice_sebelumnya || '.....'} (${invoice.sisa_volume_sebelumnya.toLocaleString('id-ID')} M³) + Pengiriman Ini (${invoice.total_kubikasi.toLocaleString('id-ID')} M³)`
+                      : `${trips.length} Ritase Pengiriman`
+                    }
                   </div>
                 </td>
                 <td className="border border-black py-3 px-2 text-center text-gray-400 italic text-[9px]">—</td>
                 <td className="border border-black py-3 px-1 text-right font-semibold">
-                  {(invoice.volume_ditagih ?? invoice.total_kubikasi).toLocaleString('id-ID')}
+                  {((invoice.sisa_volume_sebelumnya ?? 0) + invoice.total_kubikasi).toLocaleString('id-ID')}
                 </td>
                 <td className="border border-black py-3 px-1 text-center font-semibold">M³</td>
-                <td className="border border-black py-3 px-2 text-right">
+                <td className="border border-black py-3 px-2 text-center text-gray-400">—</td>
+                <td className="border border-black py-3 px-2 text-center text-gray-400">—</td>
+              </tr>}
+
+              {/* Baris 2 — Di Tagihkan */}
+              <tr className="align-top bg-blue-50">
+                <td className="border border-black py-3 px-1 text-center">2</td>
+                <td className="border border-black py-3 px-2 font-bold text-blue-900">
+                  Di Tagihkan
+                </td>
+                <td className="border border-black py-3 px-2 text-center text-gray-400 italic text-[9px]">—</td>
+                <td className="border border-black py-3 px-1 text-right font-bold text-blue-900">
+                  {(invoice.volume_ditagih ?? invoice.total_kubikasi).toLocaleString('id-ID')}
+                </td>
+                <td className="border border-black py-3 px-1 text-center font-bold text-blue-900">M³</td>
+                <td className="border border-black py-3 px-2 text-right font-bold text-blue-900">
                   {(invoice.harga_per_kubik
                     ? Math.round(invoice.harga_per_kubik)
                     : Math.round(invoice.total_harga_kotor / ((invoice.volume_ditagih ?? invoice.total_kubikasi) || 1))
                   ).toLocaleString('id-ID')}
                 </td>
-                <td className="border border-black py-3 px-2 text-right font-bold">
-                  {(invoice.total_harga_kotor - (invoice.sisa_volume_sebelumnya ? invoice.sisa_volume_sebelumnya * (invoice.harga_per_kubik || 0) : 0)).toLocaleString('id-ID')}
+                <td className="border border-black py-3 px-2 text-right font-extrabold text-blue-900">
+                  {invoice.total_harga_kotor.toLocaleString('id-ID')}
                 </td>
               </tr>
 
-              {/* Baris 2 — Sisa Volume Invoice Sebelumnya */}
-              {invoice.sisa_volume_sebelumnya !== undefined && invoice.sisa_volume_sebelumnya > 0 && (
-                <tr className="align-top bg-blue-50">
-                  <td className="border border-black py-3 px-1 text-center">2</td>
+              {/* Baris 3 — Sisa Penagihan */}
+              {invoice.sisa_volume !== undefined && invoice.sisa_volume > 0 && (
+                <tr className="align-top">
+                  <td className="border border-black py-3 px-1 text-center">3</td>
                   <td className="border border-black py-3 px-2 font-semibold">
-                    Sisa Volume Invoice Sebelumnya
+                    Sisa Penagihan
                   </td>
                   <td className="border border-black py-3 px-2 text-center text-gray-400 italic text-[9px]">—</td>
                   <td className="border border-black py-3 px-1 text-right font-semibold">
-                    {invoice.sisa_volume_sebelumnya.toLocaleString('id-ID')}
+                    {invoice.sisa_volume.toLocaleString('id-ID')}
                   </td>
                   <td className="border border-black py-3 px-1 text-center font-semibold">M³</td>
-                  <td className="border border-black py-3 px-2 text-right">
-                    {(invoice.harga_per_kubik ? Math.round(invoice.harga_per_kubik) : 0).toLocaleString('id-ID')}
-                  </td>
-                  <td className="border border-black py-3 px-2 text-right font-bold">
-                    {(invoice.sisa_volume_sebelumnya * (invoice.harga_per_kubik || 0)).toLocaleString('id-ID')}
-                  </td>
+                  <td className="border border-black py-3 px-2 text-center text-gray-400">—</td>
+                  <td className="border border-black py-3 px-2 text-center text-gray-400">—</td>
                 </tr>
               )}
 
@@ -292,10 +306,18 @@ export default function PrintInvoice({
                 {format(new Date(invoice.tanggal_invoice), 'dd MMMM yyyy', { locale: id })}
               </div>
               <div className="font-semibold text-[10px]">Hormat Kami,</div>
-              <br /><br /><br /><br />
-              <div className="border-t border-black w-full pt-1 font-bold text-[10px]">
-                {(invoice.nama_ttd || owner.nama).toUpperCase()}
-              </div>
+              {invoice.ttd_image ? (
+                <div className="flex flex-col items-center">
+                  <img src={invoice.ttd_image} alt="TTD" className="h-[150px] object-contain" />
+                  <div className="font-bold text-[15px]">
+                    {(invoice.nama_ttd || owner.nama).toUpperCase()}
+                  </div>
+                </div>
+              ) : (
+                <div className="border-t border-black w-full pt-1 font-bold text-[10px]">
+                  {(invoice.nama_ttd || owner.nama).toUpperCase()}
+                </div>
+              )}
             </div>
           </div>
         </div>
